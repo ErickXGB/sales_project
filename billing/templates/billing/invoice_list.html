@@ -1,0 +1,28 @@
+{% extends 'billing/base.html' %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<h2>Invoices</h2>
+<a href="{% url 'billing:invoice_create' %}" class="btn btn-primary mb-3">+ New Invoice</a>
+<table class="table table-striped table-hover">
+  <thead class="table-dark">
+    <tr><th>#</th><th>Customer</th><th>Date</th><th>Subtotal</th><th>Tax</th><th>Total</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for item in items %}
+    <tr>
+      <td>{{ item.id }}</td>
+      <td>{{ item.customer }}</td>
+      <td>{{ item.invoice_date|date:"d/m/Y H:i" }}</td>
+      <td>${{ item.subtotal }}</td>
+      <td>${{ item.tax }}</td>
+      <td><strong>${{ item.total }}</strong></td>
+      <td>
+        <a href="{% url 'billing:invoice_delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="text-center">No invoices.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
