@@ -1,26 +1,350 @@
 {% extends 'billing/base.html' %}
-{% block title %}Invoice{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-8">
-    <div class="card shadow">
-      <div class="card-header bg-primary text-white"><h4>Invoice</h4></div>
-      <div class="card-body">
-        <form method="post">
-          {% csrf_token %}
-          {% for field in form %}
+<div class="card shadow mb-4">
+  <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+    <h4 class="mb-0">{{ title }}</h4>
+  </div>
+  <div class="card-body">
+    <form method="post" id="invoice-form">
+      {% csrf_token %}
+
+      <!-- Cabecera: seleccionar cliente -->
+      <div class="card mb-4 border-secondary">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">Información del Cliente</h5>
+        </div>
+        <div class="card-body">
           <div class="mb-3">
-            <label class="form-label fw-bold">{{ field.label }}</label>
-            {{ field }}
-            <small class="text-muted">{{ field.help_text }}</small>
-            {% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
+            <label for="customer_select" class="form-label fw-bold">Seleccionar Cliente</label>
+            <select name="customer_select" id="customer_select" class="form-select" required>
+              <option value="">-- Seleccione un cliente --</option>
+              <option value="new" class="text-primary fw-bold">+ -- Nuevo Cliente --</option>
+              {% for c in customers %}
+              <option value="{{ c.id }}">{{ c.last_name }}, {{ c.first_name }} (DNI: {{ c.dni }})</option>
+              {% endfor %}
+            </select>
           </div>
-          {% endfor %}
-          <button type="submit" class="btn btn-primary">Save</button>
-          <a href="{% url 'billing:invoice_list' %}" class="btn btn-secondary">Cancel</a>
-        </form>
+
+          <!-- Campos de Cliente (se muestran dinámicamente) -->
+          <div id="customer-fields-container" style="display: none;" class="p-3 border rounded bg-light">
+            <h6 class="border-bottom pb-2 mb-3 text-secondary">Datos del Cliente</h6>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="customer_dni" class="form-label">Identificación (DNI/RUC)</label>
+                <input type="text" name="customer_dni" id="customer_dni" class="form-control"
+                  placeholder="Ej. 1726354890">
+              </div>
+              <div class="col-md-4">
+                <label for="customer_first_name" class="form-label">Nombres</label>
+                <input type="text" name="customer_first_name" id="customer_first_name" class="form-control"
+                  placeholder="Ej. María Elena">
+              </div>
+              <div class="col-md-4">
+                <label for="customer_last_name" class="form-label">Apellidos</label>
+                <input type="text" name="customer_last_name" id="customer_last_name" class="form-control"
+                  placeholder="Ej. Pazmiño Rodríguez">
+              </div>
+              <div class="col-md-4">
+                <label for="customer_email" class="form-label">Correo Electrónico</label>
+                <input type="email" name="customer_email" id="customer_email" class="form-control"
+                  placeholder="Ej. maria.paz@example.com">
+              </div>
+              <div class="col-md-4">
+                <label for="customer_phone" class="form-label">Teléfono/Celular</label>
+                <input type="text" name="customer_phone" id="customer_phone" class="form-control"
+                  placeholder="Ej. 0998765432">
+              </div>
+              <div class="col-md-4">
+                <label for="customer_address" class="form-label">Dirección</label>
+                <input type="text" name="customer_address" id="customer_address" class="form-control"
+                  placeholder="Ej. Av. de la República E7-12">
+              </div>
+              <div class="col-md-6">
+                <label for="customer_taxpayer_type" class="form-label">Tipo de Contribuyente</label>
+                <select name="customer_taxpayer_type" id="customer_taxpayer_type" class="form-select">
+                  <option value="final">Consumidor Final</option>
+                  <option value="ruc">RUC</option>
+                  <option value="rise">RISE</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="customer_payment_terms" class="form-label">Términos de Pago</label>
+                <select name="customer_payment_terms" id="customer_payment_terms" class="form-select">
+                  <option value="cash">Contado</option>
+                  <option value="credit_15">15 días</option>
+                  <option value="credit_30">30 días</option>
+                  <option value="credit_60">60 días</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <!-- Líneas de detalle -->
+      <div class="card mb-4 border-secondary">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Detalles de la Factura</h5>
+          <button type="button" class="btn btn-sm btn-outline-success" id="add-row-btn">+ Agregar Producto</button>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Producto</th>
+                  <th style="width: 150px;">Cantidad</th>
+                  <th style="width: 180px;">Precio Unitario ($)</th>
+                  <th style="width: 180px;" class="text-end">Subtotal</th>
+                  <th style="width: 80px;" class="text-center">Eliminar</th>
+                </tr>
+              </thead>
+              <tbody id="product-rows">
+                <!-- Se agregan dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen y totales -->
+      <div class="row justify-content-end mb-4">
+        <div class="col-md-4">
+          <div class="card bg-light border-secondary">
+            <div class="card-body">
+              <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span>Subtotal:</span>
+                <span id="summary-subtotal" class="fw-bold">$0.00</span>
+              </div>
+              <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span>IVA (15%):</span>
+                <span id="summary-tax" class="fw-bold">$0.00</span>
+              </div>
+              <div class="d-flex justify-content-between pt-1">
+                <span class="fs-5 fw-bold">TOTAL:</span>
+                <span id="summary-total" class="fs-5 fw-bold text-success">$0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acciones de guardado -->
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'billing:invoice_list' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-warning fw-bold text-dark">
+          Guardar Factura
+        </button>
+      </div>
+    </form>
   </div>
 </div>
+
+<!-- Datos JSON para JavaScript -->
+<script id="customers-data" type="application/json">
+  {{ customers_json_str|safe }}
+</script>
+<script id="products-data" type="application/json">
+  {{ products_json_str|safe }}
+</script>
+<script id="posted-values-data" type="application/json">
+  {% if posted_values_json %}{{ posted_values_json|safe }}{% else %}null{% endif %}
+</script>
+<script id="selected-items-data" type="application/json">
+  {% if selected_items_json %}{{ selected_items_json|safe }}{% else %}null{% endif %}
+</script>
+
+<!-- Lógica interactiva en Javascript -->
+<script>
+  const customersData = JSON.parse(document.getElementById('customers-data').textContent);
+  const productsData = JSON.parse(document.getElementById('products-data').textContent);
+  const postedValues = JSON.parse(document.getElementById('posted-values-data').textContent);
+  const selectedItems = JSON.parse(document.getElementById('selected-items-data').textContent);
+
+  const clientSelect = document.querySelector('#customer_select');
+  const clientFields = document.querySelector('#customer-fields-container');
+  const addRowBtn = document.querySelector('#add-row-btn');
+
+  // Controlar campos de clientes
+  clientSelect.addEventListener('change', function () {
+    const val = this.value;
+    if (val === '') {
+      clientFields.style.display = 'none';
+      clearClientFields();
+      setClientFieldsRequired(false);
+    } else if (val === 'new') {
+      clientFields.style.display = 'block';
+      clearClientFields();
+      setClientFieldsRequired(true);
+    } else {
+      clientFields.style.display = 'block';
+      const client = customersData.find(c => c.id == val);
+      if (client) {
+        document.querySelector('#customer_dni').value = client.dni;
+        document.querySelector('#customer_first_name').value = client.first_name;
+        document.querySelector('#customer_last_name').value = client.last_name;
+        document.querySelector('#customer_email').value = client.email || '';
+        document.querySelector('#customer_phone').value = client.phone || '';
+        document.querySelector('#customer_address').value = client.address || '';
+        document.querySelector('#customer_taxpayer_type').value = client.taxpayer_type;
+        document.querySelector('#customer_payment_terms').value = client.payment_terms;
+      }
+      setClientFieldsRequired(true);
+    }
+  });
+
+  function clearClientFields() {
+    document.querySelector('#customer_dni').value = '';
+    document.querySelector('#customer_first_name').value = '';
+    document.querySelector('#customer_last_name').value = '';
+    document.querySelector('#customer_email').value = '';
+    document.querySelector('#customer_phone').value = '';
+    document.querySelector('#customer_address').value = '';
+    document.querySelector('#customer_taxpayer_type').value = 'final';
+    document.querySelector('#customer_payment_terms').value = 'cash';
+  }
+
+  function setClientFieldsRequired(isRequired) {
+    document.querySelector('#customer_dni').required = isRequired;
+    document.querySelector('#customer_first_name').required = isRequired;
+    document.querySelector('#customer_last_name').required = isRequired;
+  }
+
+  // Agregar filas de productos
+  function addProductRow(productId = '', quantity = 1, price = 0) {
+    const tbody = document.querySelector('#product-rows');
+    const tr = document.createElement('tr');
+    tr.className = 'product-row';
+
+    let options = '<option value="">-- Seleccione un producto --</option>';
+    productsData.forEach(p => {
+      const selected = p.id == productId ? 'selected' : '';
+      options += `<option value="${p.id}" ${selected} data-price="${p.price}" data-stock="${p.stock}">${p.name}</option>`;
+    });
+
+    tr.innerHTML = `
+      <td>
+        <select name="product[]" class="form-select product-select" required>
+          ${options}
+        </select>
+        <small class="text-muted stock-info d-block mt-1" style="display:none; font-size: 0.85em;"></small>
+      </td>
+      <td>
+        <input type="number" name="quantity[]" class="form-control quantity-input" min="1" value="${quantity}" required>
+      </td>
+      <td>
+        <input type="number" name="price[]" class="form-control price-input bg-light" step="0.01" min="0" value="${parseFloat(price).toFixed(2)}" readonly required>
+      </td>
+      <td class="text-end align-middle fw-bold row-subtotal" style="font-size: 1.1em;">
+        $0.00
+      </td>
+      <td class="text-center align-middle">
+        <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" style="border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 28px;">
+          &times;
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const select = tr.querySelector('.product-select');
+    const qtyInput = tr.querySelector('.quantity-input');
+    const priceInput = tr.querySelector('.price-input');
+    const removeBtn = tr.querySelector('.remove-row-btn');
+    const stockInfo = tr.querySelector('.stock-info');
+
+    select.addEventListener('change', function () {
+      const option = this.options[this.selectedIndex];
+      if (option.value) {
+        const defaultPrice = option.getAttribute('data-price');
+        const stock = option.getAttribute('data-stock');
+        priceInput.value = parseFloat(defaultPrice).toFixed(2);
+        qtyInput.max = stock;
+        stockInfo.textContent = `Stock disponible: ${stock}`;
+        stockInfo.style.display = 'block';
+      } else {
+        priceInput.value = '0.00';
+        stockInfo.style.display = 'none';
+        qtyInput.removeAttribute('max');
+      }
+      calculateTotals();
+    });
+
+    qtyInput.addEventListener('input', calculateTotals);
+    priceInput.addEventListener('input', calculateTotals);
+
+    removeBtn.addEventListener('click', function () {
+      tr.remove();
+      calculateTotals();
+    });
+
+    // Restaurar si se cargaron valores previamente
+    if (productId) {
+      const option = select.options[select.selectedIndex];
+      if (option && option.value) {
+        const stock = option.getAttribute('data-stock');
+        qtyInput.max = stock;
+        stockInfo.textContent = `Stock disponible: ${stock}`;
+        stockInfo.style.display = 'block';
+      }
+      priceInput.value = parseFloat(price).toFixed(2);
+    }
+
+    calculateTotals();
+  }
+
+  function calculateTotals() {
+    let subtotal = 0;
+    const rows = document.querySelectorAll('.product-row');
+
+    rows.forEach(row => {
+      const qty = parseInt(row.querySelector('.quantity-input').value) || 0;
+      const price = parseFloat(row.querySelector('.price-input').value) || 0;
+      const rowSub = qty * price;
+      row.querySelector('.row-subtotal').textContent = `$${rowSub.toFixed(2)}`;
+      subtotal += rowSub;
+    });
+
+    const tax = subtotal * 0.15; // IVA 15%
+    const total = subtotal + tax;
+
+    document.querySelector('#summary-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.querySelector('#summary-tax').textContent = `$${tax.toFixed(2)}`;
+    document.querySelector('#summary-total').textContent = `$${total.toFixed(2)}`;
+  }
+
+  addRowBtn.addEventListener('click', () => addProductRow());
+
+  // Carga inicial
+  window.addEventListener('load', function () {
+    if (postedValues) {
+      clientSelect.value = postedValues.customer_select;
+      clientFields.style.display = postedValues.customer_select !== '' ? 'block' : 'none';
+
+      document.querySelector('#customer_dni').value = postedValues.customer_dni || '';
+      document.querySelector('#customer_first_name').value = postedValues.customer_first_name || '';
+      document.querySelector('#customer_last_name').value = postedValues.customer_last_name || '';
+      document.querySelector('#customer_email').value = postedValues.customer_email || '';
+      document.querySelector('#customer_phone').value = postedValues.customer_phone || '';
+      document.querySelector('#customer_address').value = postedValues.customer_address || '';
+      document.querySelector('#customer_taxpayer_type').value = postedValues.customer_taxpayer_type || 'final';
+      document.querySelector('#customer_payment_terms').value = postedValues.customer_payment_terms || 'cash';
+
+      setClientFieldsRequired(postedValues.customer_select !== '');
+    } else {
+      clientFields.style.display = 'none';
+      setClientFieldsRequired(false);
+    }
+
+    if (selectedItems && selectedItems.length > 0) {
+      selectedItems.forEach(item => {
+        addProductRow(item.product_id, item.quantity, item.price);
+      });
+    } else {
+      // Iniciar con una fila vacía
+      addProductRow();
+    }
+  });
+</script>
 {% endblock %}

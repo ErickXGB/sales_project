@@ -1,27 +1,130 @@
 {% extends 'billing/base.html' %}
-{% block title %}{{ title }}{% endblock %}
+{% block title %}{{ title }} - Sistema de Ventas{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="card shadow">
-      <div class="card-header bg-primary text-white"><h4>Crear Marca</h4></div>
-      <div class="card-body">
-        <form method="post">
-          {% csrf_token %}
-          {% for field in form %}
-          <div class="mb-3">
-            <label class="form-label">{{ field.label }}</label>
-            {{ field }}
-            {% for error in field.errors %}
-            <div class="text-danger">{{ error }}</div>
-            {% endfor %}
+<div class="row">
+  <div class="col-12 mb-4">
+    <h2>Gestionar Marca</h2>
+    <p class="text-muted">Configure las marcas para los productos de la tienda e incluya un logotipo o foto representativa.</p>
+  </div>
+</div>
+
+<div class="row">
+  <!-- Columna de Imagen / Vista Previa -->
+  <div class="col-md-4 text-center mb-4">
+    <div class="card shadow-sm p-4 border-0" style="border-radius: 16px; background-color: #f8f9fa;">
+      <h6 class="text-secondary fw-bold text-uppercase mb-3" style="font-size: 0.85rem; letter-spacing: 1px;">Logotipo / Foto de la Marca</h6>
+      
+      <div class="d-flex justify-content-center align-items-center mb-3" style="min-height: 250px; background-color: #ffffff; border: 2px dashed #dee2e6; border-radius: 12px; overflow: hidden; padding: 10px;">
+        {% if form.instance.image %}
+          <img src="{{ form.instance.image.url }}" id="imagePreview" class="img-fluid rounded" style="max-height: 240px; object-fit: contain; display: block; margin: auto;">
+          <div id="previewPlaceholder" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 60px; height: 60px; margin: auto; display: block;">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span class="text-muted small d-block mt-2">Sin foto de marca</span>
           </div>
-          {% endfor %}
-          <button type="submit" class="btn btn-primary">Guardar</button>
-          <a href="{% url 'billing:brand_list' %}" class="btn btn-secondary">Cancelar</a>
+        {% else %}
+          <img src="" id="imagePreview" class="img-fluid rounded" style="max-height: 240px; object-fit: contain; display: none; margin: auto;">
+          <div id="previewPlaceholder" class="text-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 60px; height: 60px; margin: auto; display: block;">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span class="text-muted small d-block mt-2">Sin foto de marca</span>
+          </div>
+        {% endif %}
+      </div>
+      
+      <p class="text-muted small mb-0">La vista previa se actualizará en tiempo real al seleccionar un archivo nuevo.</p>
+    </div>
+  </div>
+
+  <!-- Columna de Datos/Formulario -->
+  <div class="col-md-8">
+    <div class="card shadow-sm border-0" style="border-radius: 16px; background-color: #ffffff;">
+      <div class="card-header text-white p-3" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-tag-fill me-2"></i>Información de la Marca</h5>
+      </div>
+      <div class="card-body p-4">
+        <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+          {% csrf_token %}
+          
+          <div class="row g-3">
+            <!-- Nombre de la Marca -->
+            <div class="col-12">
+              <label class="form-label fw-bold text-secondary small text-uppercase" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+              {{ form.name }}
+              {% for error in form.name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <!-- Descripción -->
+            <div class="col-12">
+              <label class="form-label fw-bold text-secondary small text-uppercase" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+              {{ form.description }}
+              {% for error in form.description.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <!-- Subir Foto -->
+            <div class="col-12">
+              <label class="form-label fw-bold text-secondary small text-uppercase" for="{{ form.image.id_for_label }}">{{ form.image.label }}</label>
+              {{ form.image }}
+              {% for error in form.image.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+
+            <!-- Estado Activo -->
+            <div class="col-12 my-3">
+              <div class="form-check form-switch">
+                {{ form.is_active }}
+                <label class="form-check-label fw-bold text-secondary small text-uppercase ms-2" for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+              </div>
+              {% for error in form.is_active.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+
+          <div class="d-flex gap-3 justify-content-end mt-4">
+            <a href="{% url 'billing:brand_list' %}" class="btn btn-outline-secondary" style="border-radius: 8px; padding: 10px 24px; font-weight: 600;">Cancelar</a>
+            <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #2f5597 0%, #1f4e78 100%); border: none; border-radius: 8px; padding: 10px 24px; font-weight: 600;">Guardar Marca</button>
+          </div>
         </form>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Scripts para la vista previa dinámica de la imagen -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const imageInput = document.getElementById('id_image');
+  const preview = document.getElementById('imagePreview');
+  const placeholder = document.getElementById('previewPlaceholder');
+  
+  if (imageInput) {
+    imageInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          if (preview) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            if (placeholder) {
+              placeholder.style.display = 'none';
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        {% if not form.instance.image %}
+          if (preview) preview.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'block';
+        {% endif %}
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

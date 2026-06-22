@@ -1,24 +1,55 @@
 {% extends 'billing/base.html' %}
-{% block title %}Product Groups{% endblock %}
+{% block title %}Grupos de Productos{% endblock %}
 {% block content %}
-<h2>Product Groups</h2>
-<a href="{% url 'billing:productgroup_create' %}" class="btn btn-primary mb-3">+ New Product Group</a>
+<h2>Grupos de Productos</h2>
+
+<!-- Buscador por campos (Compacto) -->
+<form method="get" class="mb-4">
+  <div class="input-group shadow-sm" style="max-width: 700px;">
+    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+      <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
+      <option value="name" {% if search_field == 'name' %}selected{% endif %}>Nombre</option>
+      <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
+    </select>
+    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle" placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="{% url 'billing:productgroup_list' %}" class="btn btn-outline-secondary">Limpiar</a>
+  </div>
+</form>
+
+<div class="mb-3">
+  <a href="{% url 'billing:productgroup_create' %}" class="btn btn-success">+ Nuevo Grupo de Productos</a>
+</div>
+
 <table class="table table-striped table-hover">
   <thead class="table-dark">
-    <tr><th>Name</th><th>Active</th><th>Actions</th></tr>
+    <tr>
+      <th>Nombre</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
   </thead>
   <tbody>
     {% for item in items %}
     <tr>
       <td>{{ item.name }}</td>
-      <td>{{ item.is_active }}</td>
       <td>
-        <a href="{% url 'billing:productgroup_update' item.pk %}" class="btn btn-sm btn-warning">Edit</a>
-        <a href="{% url 'billing:productgroup_delete' item.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        {% if item.is_active %}
+        <span class="badge bg-success">Sí</span>
+        {% else %}
+        <span class="badge bg-danger">No</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="{% url 'billing:productgroup_update' item.pk %}" class="btn btn-sm btn-warning">Editar</a>
+        <a href="{% url 'billing:productgroup_delete' item.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
       </td>
     </tr>
     {% empty %}
-    <tr><td colspan="3" class="text-center">No records.</td></tr>
+    <tr>
+      <td colspan="3" class="text-center">Categoría o grupo no encontrado.</td>
+    </tr>
     {% endfor %}
   </tbody>
 </table>

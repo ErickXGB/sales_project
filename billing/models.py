@@ -1,4 +1,5 @@
 from django.db import models
+from shared.validators import validate_cedula_ec
 
 # Create your models here.
 
@@ -6,6 +7,7 @@ class Brand(models.Model):
     """Marcas de productos."""
     name = models.CharField(max_length=100, unique=True, verbose_name='Brand Name')
     description = models.TextField(blank=True, null=True)
+    image = models.ImageField(upload_to='brands/', blank=True, null=True, verbose_name='Imagen de Marca')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -46,12 +48,13 @@ class Supplier(models.Model):
 class Product(models.Model):
     """Productos. FK a Brand/Group, M2M a Supplier."""
     name = models.CharField(max_length=200, verbose_name='Product Name')
-    description = models.TextField(blank=True, null=True)
+    description = models.TextField(default="", verbose_name='Descripción')
     brand = models.ForeignKey(Brand, on_delete=models.PROTECT, related_name='products')
     group = models.ForeignKey(ProductGroup, on_delete=models.PROTECT, related_name='products')
     suppliers = models.ManyToManyField(Supplier, related_name='products', blank=True)
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
     stock = models.IntegerField(default=0)
+    image = models.ImageField(upload_to='products/', blank=True, null=True, verbose_name='Imagen')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -60,10 +63,13 @@ class Product(models.Model):
         verbose_name_plural = 'Products'
         ordering = ['name']
     def __str__(self): return f'{self.name} ({self.brand.name})'
+    @property
+    def balance(self):
+        return self.unit_price * self.stock
 
 class Customer(models.Model):
     """Clientes. OneToOne con CustomerProfile."""
-    dni = models.CharField(max_length=13, unique=True, verbose_name='DNI/RUC')
+    dni = models.CharField(max_length=13, unique=True, verbose_name='DNI/RUC', validators=[validate_cedula_ec])
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     email = models.EmailField(blank=True, null=True)
