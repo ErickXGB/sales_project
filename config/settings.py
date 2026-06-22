@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'billing',  # Nuestra app de facturación
+    'purchasing',  # Nuestra app de compras
     'django_extensions',
 ]
 
