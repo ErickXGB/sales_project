@@ -1,0 +1,343 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card shadow mb-4">
+  <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+    <h4 class="mb-0">{{ title }}</h4>
+  </div>
+  <div class="card-body">
+    <form method="post" id="purchase-form">
+      {% csrf_token %}
+
+      <!-- Cabecera: seleccionar proveedor -->
+      <div class="card mb-4 border-secondary">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">Información del Proveedor</h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label for="supplier_select" class="form-label fw-bold">Seleccionar Proveedor</label>
+            <select name="supplier_select" id="supplier_select" class="form-select" required>
+              <option value="">-- Seleccione un proveedor --</option>
+              <option value="new" class="text-primary fw-bold">+ -- Nuevo Proveedor --</option>
+              {% for s in suppliers %}
+              <option value="{{ s.id }}">{{ s.name }} (Contacto: {{ s.contact_name }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Campos de Proveedor (se muestran dinámicamente) -->
+          <div id="supplier-fields-container" style="display: none;" class="p-3 border rounded bg-light">
+            <h6 class="border-bottom pb-2 mb-3 text-secondary">Datos del Proveedor</h6>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="supplier_name" class="form-label">Nombre del Proveedor (Empresa)</label>
+                <input type="text" name="supplier_name" id="supplier_name" class="form-control"
+                  placeholder="Ej. Importadora Galarza S.A.">
+              </div>
+              <div class="col-md-6">
+                <label for="supplier_contact_name" class="form-label">Nombre de Contacto</label>
+                <input type="text" name="supplier_contact_name" id="supplier_contact_name" class="form-control"
+                  placeholder="Ej. Ing. Carlos Mendoza">
+              </div>
+              <div class="col-md-4">
+                <label for="supplier_email" class="form-label">Correo Electrónico</label>
+                <input type="email" name="supplier_email" id="supplier_email" class="form-control"
+                  placeholder="Ej. ventas@importadoragalarza.com">
+              </div>
+              <div class="col-md-4">
+                <label for="supplier_phone" class="form-label">Teléfono/Celular</label>
+                <input type="text" name="supplier_phone" id="supplier_phone" class="form-control"
+                  placeholder="Ej. 0998765432">
+              </div>
+              <div class="col-md-4">
+                <label for="supplier_address" class="form-label">Dirección</label>
+                <input type="text" name="supplier_address" id="supplier_address" class="form-control"
+                  placeholder="Ej. Av. Amazonas N21-120 y Robles">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Número de documento y fecha -->
+      <div class="row g-3 mt-2">
+        <div class="col-md-6">
+          <label for="document_number" class="form-label fw-bold">Número de Documento / Factura</label>
+          <input type="text" name="document_number" id="document_number" class="form-control"
+            placeholder="Ej. 001-001-000012345" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-bold text-secondary">Fecha y Hora de Registro</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="text" id="current-datetime-display" class="form-control bg-light text-muted fst-italic"
+              readonly style="cursor: default;" tabindex="-1">
+            <span class="badge bg-secondary text-nowrap" style="font-size: 0.75em;">Automática</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Líneas de detalle -->
+      <div class="card mb-4 border-secondary">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h5 class="card-title mb-0">Detalles de la Compra</h5>
+          <button type="button" class="btn btn-sm btn-outline-success" id="add-row-btn">+ Agregar Producto</button>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-bordered mb-0">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Producto</th>
+                  <th style="width: 150px;">Cantidad</th>
+                  <th style="width: 180px;">Costo Unitario ($)</th>
+                  <th style="width: 180px;" class="text-end">Subtotal</th>
+                  <th style="width: 80px;" class="text-center">Eliminar</th>
+                </tr>
+              </thead>
+              <tbody id="product-rows">
+                <!-- Se agregan dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen y totales -->
+      <div class="row justify-content-end mb-4">
+        <div class="col-md-4">
+          <div class="card bg-light border-secondary">
+            <div class="card-body">
+              <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span>Subtotal:</span>
+                <span id="summary-subtotal" class="fw-bold">$0.00</span>
+              </div>
+              <div class="d-flex justify-content-between border-bottom pb-2 mb-2">
+                <span>IVA (15%):</span>
+                <span id="summary-tax" class="fw-bold">$0.00</span>
+              </div>
+              <div class="d-flex justify-content-between pt-1">
+                <span class="fs-5 fw-bold">TOTAL:</span>
+                <span id="summary-total" class="fs-5 fw-bold text-success">$0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acciones de guardado -->
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-warning fw-bold text-dark">
+          Guardar Compra
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Datos JSON para JavaScript -->
+<script id="suppliers-data" type="application/json">
+  {{ suppliers_json_str|safe }}
+</script>
+<script id="products-data" type="application/json">
+  {{ products_json_str|safe }}
+</script>
+<script id="posted-values-data" type="application/json">
+  {% if posted_values_json %}{{ posted_values_json|safe }}{% else %}null{% endif %}
+</script>
+<script id="selected-items-data" type="application/json">
+  {% if selected_items_json %}{{ selected_items_json|safe }}{% else %}null{% endif %}
+</script>
+
+<!-- Lógica interactiva en Javascript -->
+<script>
+  const suppliersData = JSON.parse(document.getElementById('suppliers-data').textContent);
+  const productsData = JSON.parse(document.getElementById('products-data').textContent);
+  const postedValues = JSON.parse(document.getElementById('posted-values-data').textContent);
+  const selectedItems = JSON.parse(document.getElementById('selected-items-data').textContent);
+
+  // Reloj en tiempo real para mostrar la fecha/hora de registro
+  function updateCurrentDatetime() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const formatted =
+      `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}  ` +
+      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const el = document.getElementById('current-datetime-display');
+    if (el) el.value = formatted;
+  }
+  updateCurrentDatetime();
+  setInterval(updateCurrentDatetime, 1000);
+
+  const supplierSelect = document.querySelector('#supplier_select');
+  const supplierFields = document.querySelector('#supplier-fields-container');
+  const addRowBtn = document.querySelector('#add-row-btn');
+
+  // Controlar campos de proveedores
+  supplierSelect.addEventListener('change', function () {
+    const val = this.value;
+    if (val === '') {
+      supplierFields.style.display = 'none';
+      clearSupplierFields();
+      setSupplierFieldsRequired(false);
+    } else if (val === 'new') {
+      supplierFields.style.display = 'block';
+      clearSupplierFields();
+      setSupplierFieldsRequired(true);
+    } else {
+      supplierFields.style.display = 'block';
+      const supplier = suppliersData.find(s => s.id == val);
+      if (supplier) {
+        document.querySelector('#supplier_name').value = supplier.name;
+        document.querySelector('#supplier_contact_name').value = supplier.contact_name || '';
+        document.querySelector('#supplier_email').value = supplier.email || '';
+        document.querySelector('#supplier_phone').value = supplier.phone || '';
+        document.querySelector('#supplier_address').value = supplier.address || '';
+      }
+      setSupplierFieldsRequired(true);
+    }
+  });
+
+  function clearSupplierFields() {
+    document.querySelector('#supplier_name').value = '';
+    document.querySelector('#supplier_contact_name').value = '';
+    document.querySelector('#supplier_email').value = '';
+    document.querySelector('#supplier_phone').value = '';
+    document.querySelector('#supplier_address').value = '';
+  }
+
+  function setSupplierFieldsRequired(isRequired) {
+    document.querySelector('#supplier_name').required = isRequired;
+  }
+
+  // Agregar filas de productos
+  function addProductRow(productId = '', quantity = 1, cost = 0.00) {
+    const tbody = document.querySelector('#product-rows');
+    const tr = document.createElement('tr');
+    tr.className = 'product-row';
+
+    let options = '<option value="">-- Seleccione un producto --</option>';
+    productsData.forEach(p => {
+      const selected = p.id == productId ? 'selected' : '';
+      options += `<option value="${p.id}" ${selected} data-price="${p.price}">${p.name}</option>`;
+    });
+
+    tr.innerHTML = `
+      <td>
+        <select name="product[]" class="form-select product-select" required>
+          ${options}
+        </select>
+        <small class="text-muted stock-info d-block mt-1" style="display:none; font-size: 0.85em;"></small>
+      </td>
+      <td>
+        <input type="number" name="quantity[]" class="form-control quantity-input" min="1" value="${quantity}" required>
+      </td>
+      <td>
+        <input type="number" name="unit_cost[]" class="form-control cost-input bg-light" step="0.01" min="0" value="${parseFloat(cost).toFixed(2)}" readonly required>
+      </td>
+      <td class="text-end align-middle fw-bold row-subtotal" style="font-size: 1.1em;">
+        $0.00
+      </td>
+      <td class="text-center align-middle">
+        <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" style="border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 28px;">
+          &times;
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    const select = tr.querySelector('.product-select');
+    const qtyInput = tr.querySelector('.quantity-input');
+    const costInput = tr.querySelector('.cost-input');
+    const removeBtn = tr.querySelector('.remove-row-btn');
+    const stockInfo = tr.querySelector('.stock-info');
+
+    select.addEventListener('change', function () {
+      const option = this.options[this.selectedIndex];
+      if (option.value) {
+        // En compras, el costo sugerido puede ser el precio base del producto, aunque se puede editar
+        const defaultPrice = option.getAttribute('data-price');
+        costInput.value = parseFloat(defaultPrice).toFixed(2);
+        stockInfo.textContent = `Precio referencial: $${parseFloat(defaultPrice).toFixed(2)}`;
+        stockInfo.style.display = 'block';
+      } else {
+        costInput.value = '0.00';
+        stockInfo.style.display = 'none';
+      }
+      calculateTotals();
+    });
+
+    qtyInput.addEventListener('input', calculateTotals);
+
+    removeBtn.addEventListener('click', function () {
+      tr.remove();
+      calculateTotals();
+    });
+
+     // Restaurar info si se cargaron valores previos
+    if (productId) {
+      const option = select.options[select.selectedIndex];
+      if (option && option.value) {
+        const defaultPrice = option.getAttribute('data-price');
+        stockInfo.textContent = `Precio referencial: $${parseFloat(defaultPrice).toFixed(2)}`;
+        stockInfo.style.display = 'block';
+      }
+      costInput.value = parseFloat(cost).toFixed(2);
+    }
+    
+    calculateTotals();
+  }
+
+  function calculateTotals() {
+    let subtotal = 0;
+    const rows = document.querySelectorAll('.product-row');
+
+    rows.forEach(row => {
+      const qty = parseInt(row.querySelector('.quantity-input').value) || 0;
+      const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
+      const rowSub = qty * cost;
+      row.querySelector('.row-subtotal').textContent = `$${rowSub.toFixed(2)}`;
+      subtotal += rowSub;
+    });
+
+    const tax = subtotal * 0.15; // IVA 15%
+    const total = subtotal + tax;
+
+    document.querySelector('#summary-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+    document.querySelector('#summary-tax').textContent = `$${tax.toFixed(2)}`;
+    document.querySelector('#summary-total').textContent = `$${total.toFixed(2)}`;
+  }
+
+  addRowBtn.addEventListener('click', () => addProductRow());
+
+  // Carga inicial
+  window.addEventListener('load', function () {
+    if (postedValues) {
+      supplierSelect.value = postedValues.supplier_select;
+      supplierFields.style.display = postedValues.supplier_select !== '' ? 'block' : 'none';
+
+      document.querySelector('#supplier_name').value = postedValues.supplier_name || '';
+      document.querySelector('#supplier_contact_name').value = postedValues.supplier_contact_name || '';
+      document.querySelector('#supplier_email').value = postedValues.supplier_email || '';
+      document.querySelector('#supplier_phone').value = postedValues.supplier_phone || '';
+      document.querySelector('#supplier_address').value = postedValues.supplier_address || '';
+      document.querySelector('#document_number').value = postedValues.document_number || '';
+
+      setSupplierFieldsRequired(postedValues.supplier_select !== '');
+    } else {
+      supplierFields.style.display = 'none';
+      setSupplierFieldsRequired(false);
+    }
+
+    if (selectedItems && selectedItems.length > 0) {
+      selectedItems.forEach(item => {
+        addProductRow(item.product_id, item.quantity, item.unit_cost);
+      });
+    } else {
+      addProductRow();
+    }
+  });
+</script>
+{% endblock %}
