@@ -1,58 +1,32 @@
 {% extends 'billing/base.html' %}
 {% block title %}Compras{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h2>Compras (Adquisiciones)</h2>
+<h2>Compras (Adquisiciones)</h2>
+
+<!-- Buscador por campos (Compacto) -->
+<form method="get" class="mb-4">
+  <div class="input-group shadow-sm" style="max-width: 700px;">
+    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+      <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
+      <option value="supplier" {% if search_field == 'supplier' %}selected{% endif %}>Proveedor</option>
+      <option value="document" {% if search_field == 'document' %}selected{% endif %}>Nº Documento</option>
+      <option value="date" {% if search_field == 'date' %}selected{% endif %}>Fecha (AAAA-MM-DD)</option>
+      <option value="total" {% if search_field == 'total' %}selected{% endif %}>Total ($)</option>
+      <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
+    </select>
+    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
+      placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-outline-secondary">Limpiar</a>
+  </div>
+</form>
+
+<div class="mb-3 d-flex gap-2">
+  <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-success">+ Nueva Compra</a>
   <a href="{% url 'purchasing:purchase_report' %}" class="btn btn-outline-primary">Ver Reporte de Costos</a>
 </div>
 
-<!-- Filtros de Compra -->
-<div class="card shadow-sm mb-4 border-secondary">
-  <div class="card-header bg-light">
-    <h6 class="mb-0 fw-bold text-secondary">Filtros de Búsqueda</h6>
-  </div>
-  <div class="card-body">
-    <form method="get" class="row g-3">
-      <!-- Proveedor -->
-      <div class="col-md-3">
-        <label for="supplier" class="form-label fw-bold">Proveedor</label>
-        <select name="supplier" id="supplier" class="form-select border-secondary-subtle">
-          <option value="">-- Todos los Proveedores --</option>
-          {% for s in suppliers %}
-          <option value="{{ s.id }}" {% if s.id|stringformat:"s" == selected_supplier %}selected{% endif %}>{{ s.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <!-- Año -->
-      <div class="col-md-2">
-        <label for="year" class="form-label fw-bold">Año</label>
-        <input type="number" name="year" id="year" class="form-control border-secondary-subtle" placeholder="Ej. 2026" value="{{ selected_year }}">
-      </div>
-      <!-- Rango de Fechas -->
-      <div class="col-md-3">
-        <label for="start_date" class="form-label fw-bold">Fecha Inicio</label>
-        <input type="date" name="start_date" id="start_date" class="form-control border-secondary-subtle" value="{{ start_date }}">
-      </div>
-      <div class="col-md-3">
-        <label for="end_date" class="form-label fw-bold">Fecha Fin</label>
-        <input type="date" name="end_date" id="end_date" class="form-control border-secondary-subtle" value="{{ end_date }}">
-      </div>
-      <!-- Acciones de Filtro -->
-      <div class="col-md-1 d-flex align-items-end">
-        <div class="d-grid w-100 gap-2">
-          <button type="submit" class="btn btn-primary">Filtrar</button>
-        </div>
-      </div>
-    </form>
-    <div class="mt-2 text-end">
-      <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-link text-secondary btn-sm" style="text-decoration:none;">Limpiar Filtros</a>
-    </div>
-  </div>
-</div>
-
-<div class="mb-3">
-  <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-success">+ Nueva Compra</a>
-</div>
 
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">

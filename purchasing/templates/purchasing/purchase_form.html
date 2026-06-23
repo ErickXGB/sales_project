@@ -60,16 +60,19 @@
         </div>
       </div>
 
-      <!-- Datos del documento de la compra -->
-      <div class="card mb-4 border-secondary">
-        <div class="card-header bg-light">
-          <h5 class="card-title mb-0">Detalles de Factura del Proveedor</h5>
+      <!-- Número de documento y fecha -->
+      <div class="row g-3 mt-2">
+        <div class="col-md-6">
+          <label for="document_number" class="form-label fw-bold">Número de Documento / Factura</label>
+          <input type="text" name="document_number" id="document_number" class="form-control"
+            placeholder="Ej. 001-001-000012345" required>
         </div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label for="document_number" class="form-label fw-bold">Número de Documento / Factura</label>
-            <input type="text" name="document_number" id="document_number" class="form-control border-secondary-subtle"
-              placeholder="Ej. 001-001-000012345" required>
+        <div class="col-md-6">
+          <label class="form-label fw-bold text-secondary">Fecha y Hora de Registro</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="text" id="current-datetime-display" class="form-control bg-light text-muted fst-italic"
+              readonly style="cursor: default;" tabindex="-1">
+            <span class="badge bg-secondary text-nowrap" style="font-size: 0.75em;">Automática</span>
           </div>
         </div>
       </div>
@@ -154,6 +157,19 @@
   const postedValues = JSON.parse(document.getElementById('posted-values-data').textContent);
   const selectedItems = JSON.parse(document.getElementById('selected-items-data').textContent);
 
+  // Reloj en tiempo real para mostrar la fecha/hora de registro
+  function updateCurrentDatetime() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const formatted =
+      `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}  ` +
+      `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const el = document.getElementById('current-datetime-display');
+    if (el) el.value = formatted;
+  }
+  updateCurrentDatetime();
+  setInterval(updateCurrentDatetime, 1000);
+
   const supplierSelect = document.querySelector('#supplier_select');
   const supplierFields = document.querySelector('#supplier-fields-container');
   const addRowBtn = document.querySelector('#add-row-btn');
@@ -212,12 +228,13 @@
         <select name="product[]" class="form-select product-select" required>
           ${options}
         </select>
+        <small class="text-muted stock-info d-block mt-1" style="display:none; font-size: 0.85em;"></small>
       </td>
       <td>
         <input type="number" name="quantity[]" class="form-control quantity-input" min="1" value="${quantity}" required>
       </td>
       <td>
-        <input type="number" name="unit_cost[]" class="form-control cost-input" step="0.01" min="0" value="${parseFloat(cost).toFixed(2)}" required>
+        <input type="number" name="unit_cost[]" class="form-control cost-input bg-light" step="0.01" min="0" value="${parseFloat(cost).toFixed(2)}" readonly required>
       </td>
       <td class="text-end align-middle fw-bold row-subtotal" style="font-size: 1.1em;">
         $0.00
@@ -235,6 +252,7 @@
     const qtyInput = tr.querySelector('.quantity-input');
     const costInput = tr.querySelector('.cost-input');
     const removeBtn = tr.querySelector('.remove-row-btn');
+    const stockInfo = tr.querySelector('.stock-info');
 
     select.addEventListener('change', function () {
       const option = this.options[this.selectedIndex];
@@ -242,20 +260,33 @@
         // En compras, el costo sugerido puede ser el precio base del producto, aunque se puede editar
         const defaultPrice = option.getAttribute('data-price');
         costInput.value = parseFloat(defaultPrice).toFixed(2);
+        stockInfo.textContent = `Precio referencial: $${parseFloat(defaultPrice).toFixed(2)}`;
+        stockInfo.style.display = 'block';
       } else {
         costInput.value = '0.00';
+        stockInfo.style.display = 'none';
       }
       calculateTotals();
     });
 
     qtyInput.addEventListener('input', calculateTotals);
-    costInput.addEventListener('input', calculateTotals);
 
     removeBtn.addEventListener('click', function () {
       tr.remove();
       calculateTotals();
     });
 
+     // Restaurar info si se cargaron valores previos
+    if (productId) {
+      const option = select.options[select.selectedIndex];
+      if (option && option.value) {
+        const defaultPrice = option.getAttribute('data-price');
+        stockInfo.textContent = `Precio referencial: $${parseFloat(defaultPrice).toFixed(2)}`;
+        stockInfo.style.display = 'block';
+      }
+      costInput.value = parseFloat(cost).toFixed(2);
+    }
+    
     calculateTotals();
   }
 

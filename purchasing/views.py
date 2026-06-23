@@ -4,41 +4,44 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import F, Avg
+from django.db.models import F, Avg, Q
 from decimal import Decimal
 from billing.models import Supplier, Product
 from .models import Purchase, PurchaseDetail
 
 @login_required
 def purchase_list(request):
-    """Lista todas las compras con filtros por proveedor y rango de fechas."""
+    """Lista todas las compras con búsqueda por campo (igual que product_list)."""
     purchases = Purchase.objects.select_related('supplier').all()
-    
-    # Obtener parámetros de filtro
-    supplier_id = request.GET.get('supplier', '').strip()
-    year = request.GET.get('year', '').strip()
-    start_date = request.GET.get('start_date', '').strip()
-    end_date = request.GET.get('end_date', '').strip()
-    
-    if supplier_id:
-        purchases = purchases.filter(supplier_id=supplier_id)
-        
-    if year:
-        if year.isdigit():
-            purchases = purchases.filter(purchase_date__year=int(year))
-            
-    if start_date and end_date:
-        purchases = purchases.filter(purchase_date__date__range=[start_date, end_date])
-        
-    suppliers = Supplier.objects.filter(is_active=True)
-    
+
+    search_field = request.GET.get('search_field', 'all').strip()
+    search_value = request.GET.get('search_value', '').strip()
+
+    if search_value:
+        if search_field == 'supplier' or search_field == 'all':
+            if search_field == 'all':
+                purchases = purchases.filter(
+                    Q(supplier__name__icontains=search_value) |
+                    Q(document_number__icontains=search_value) |
+                    Q(purchase_date__icontains=search_value) |
+                    Q(total__icontains=search_value)
+                )
+            else:
+                purchases = purchases.filter(supplier__name__icontains=search_value)
+        elif search_field == 'document':
+            purchases = purchases.filter(document_number__icontains=search_value)
+        elif search_field == 'date':
+            purchases = purchases.filter(purchase_date__date__icontains=search_value)
+        elif search_field == 'total':
+            purchases = purchases.filter(total__icontains=search_value)
+        elif search_field == 'active':
+            is_active = search_value.lower() in ['activo', 'si', 'sí', '1', 'true', 'yes']
+            purchases = purchases.filter(is_active=is_active)
+
     context = {
         'items': purchases,
-        'suppliers': suppliers,
-        'selected_supplier': supplier_id,
-        'selected_year': year,
-        'start_date': start_date,
-        'end_date': end_date,
+        'search_field': search_field,
+        'search_value': search_value,
     }
     return render(request, 'purchasing/purchase_list.html', context)
 
@@ -88,6 +91,7 @@ def purchase_create(request):
                 errors.append(f"El número de documento '{document_number}' ya está registrado para el proveedor '{supplier_name}'.")
 
         items_to_save = []
+        # Uso de decimal para evitar errores de redondeo
         subtotal = Decimal('0.00')
         
         for idx in range(len(product_ids)):
@@ -152,7 +156,7 @@ def purchase_create(request):
                         address=supplier_address
                     )
                 
-                # Check duplicate again to handle concurrent requests
+                # Verificar de nuevo que no exista
                 if Purchase.objects.filter(supplier=supplier, document_number=document_number).exists():
                     raise Exception(f"El número de documento '{document_number}' ya está registrado para este proveedor.")
                 
