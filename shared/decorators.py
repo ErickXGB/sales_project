@@ -70,3 +70,29 @@ def audit_action(action_name):
 
         return wrapper
     return decorator
+
+
+def group_required(*group_names, redirect_url='/'):
+    """
+    Decorador para vistas basadas en funciones que verifica si el usuario
+    pertenece a alguno de los grupos (roles) indicados.
+    Si no, redirige con mensaje de error.
+    El superusuario siempre pasa.
+    """
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect('login')
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+            if request.user.groups.filter(name__in=group_names).exists():
+                return view_func(request, *args, **kwargs)
+            messages.error(request, 'No tienes permiso para acceder a esta opción.')
+            return redirect(redirect_url)
+        return wrapper
+    return decorator
+

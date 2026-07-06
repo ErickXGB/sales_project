@@ -1,5 +1,5 @@
 {% extends 'billing/base.html' %}
-{% block title %}Brands{% endblock %}
+{% block title %}Marcas{% endblock %}
 {% block content %}
 <h2>Marcas</h2>
 
@@ -19,14 +19,17 @@
   </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
   <a href="{% url 'billing:brand_create' %}" class="btn btn-success">+ Nueva Marca</a>
+  <a href="{% url 'billing:brand_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
+  <a href="{% url 'billing:brand_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
 </div>
 
 <table class="table table-striped table-hover align-middle">
   <thead class="table-dark">
     <tr>
       <th>Foto</th>
+      <th>Ver</th>
       <th>Nombre</th>
       <th>Estado</th>
       <th>Creada</th>
@@ -47,6 +50,16 @@
           </svg>
         {% endif %}
       </td>
+      <td>
+        <button type="button" class="btn btn-sm btn-info text-white btn-view-brand"
+                data-name="{{ brand.name|escape }}"
+                data-description="{{ brand.description|escape|default:'Sin descripción' }}"
+                data-active="{% if brand.is_active %}Sí{% else %}No{% endif %}"
+                data-created="{{ brand.created_at|date:'d/m/Y H:i' }}"
+                data-image="{% if brand.image %}{{ brand.image.url }}{% endif %}">
+          Ver
+        </button>
+      </td>
       <td>{{ brand.name }}</td>
       <td>
         {% if brand.is_active %}
@@ -63,9 +76,85 @@
     </tr>
     {% empty %}
     <tr>
-      <td colspan="5" class="text-center">Marca no encontrada.</td>
+      <td colspan="6" class="text-center">Marca no encontrada.</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Modal de Detalles de la Marca -->
+<div class="modal fade" id="brandDetailModal" tabindex="-1" aria-labelledby="brandDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="modal-title" id="brandDetailModalLabel"><i class="bi bi-info-circle-fill me-2"></i>Detalles de la Marca</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row align-items-center">
+          <div class="col-sm-4 text-center mb-3 mb-sm-0" id="modalBrandImageCol" style="border-right: 1px solid #dee2e6;">
+            <!-- La imagen se inyecta con JS -->
+          </div>
+          <div class="col-sm-8 ps-sm-4">
+            <h3 class="text-primary mb-2" id="modalBrandName">Nombre de la Marca</h3>
+            <p class="text-muted mb-3" id="modalBrandDescription">Descripción de la marca...</p>
+            
+            <div class="row g-2">
+              <div class="col-6">
+                <span class="text-secondary small d-block fw-bold text-uppercase">Estado</span>
+                <span class="badge" id="modalBrandActive">Activo</span>
+              </div>
+              <div class="col-6">
+                <span class="text-secondary small d-block fw-bold text-uppercase">Creada</span>
+                <span class="fs-6 fw-semibold" id="modalBrandCreated">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background-color: #f8f9fa; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn btn-secondary" style="border-radius: 8px;" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = new bootstrap.Modal(document.getElementById('brandDetailModal'));
+  
+  document.querySelectorAll('.btn-view-brand').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const name = this.getAttribute('data-name');
+      const description = this.getAttribute('data-description');
+      const active = this.getAttribute('data-active');
+      const created = this.getAttribute('data-created');
+      const imageUrl = this.getAttribute('data-image');
+      
+      document.getElementById('modalBrandName').innerText = name;
+      document.getElementById('modalBrandDescription').innerText = description;
+      document.getElementById('modalBrandCreated').innerText = created;
+      
+      const activeBadge = document.getElementById('modalBrandActive');
+      activeBadge.innerText = active === 'Sí' ? 'Activa' : 'Inactiva';
+      activeBadge.className = active === 'Sí' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+      
+      const imageCol = document.getElementById('modalBrandImageCol');
+      if (imageUrl) {
+        imageCol.innerHTML = `<img src="${imageUrl}" alt="${name}" class="img-fluid rounded shadow-sm" style="max-height: 120px; object-fit: contain;">`;
+      } else {
+        imageCol.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="#6c757d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bg-light border rounded p-3 w-100" style="max-width: 100px; height: auto; margin: auto; display: block;">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        `;
+      }
+      
+      modal.show();
+    });
+  });
+});
+</script>
 {% endblock %}

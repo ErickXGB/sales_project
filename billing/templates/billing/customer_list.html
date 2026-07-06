@@ -1,5 +1,5 @@
 {% extends 'billing/base.html' %}
-{% block title %}Customers{% endblock %}
+{% block title %}Clientes{% endblock %}
 {% block content %}
 <h2>Clientes</h2>
 
@@ -21,13 +21,16 @@
   </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
   <a href="{% url 'billing:customer_create' %}" class="btn btn-success">+ Nuevo Cliente</a>
+  <a href="{% url 'billing:customer_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
+  <a href="{% url 'billing:customer_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
 </div>
 
 <table class="table table-striped table-hover">
   <thead class="table-dark">
     <tr>
+      <th>Ver</th>
       <th>DNI</th>
       <th>Apellidos</th>
       <th>Nombres</th>
@@ -39,6 +42,22 @@
   <tbody>
     {% for item in items %}
     <tr>
+      <td>
+        <button type="button" class="btn btn-sm btn-info text-white btn-view-customer"
+                data-dni="{{ item.dni }}"
+                data-name="{{ item.full_name|escape }}"
+                data-email="{{ item.email|escape|default:'-' }}"
+                data-phone="{{ item.phone|escape|default:'-' }}"
+                data-address="{{ item.address|escape|default:'Sin dirección' }}"
+                data-taxpayer="{{ item.profile.get_taxpayer_type_display|escape|default:'Consumidor Final' }}"
+                data-payment="{{ item.profile.get_payment_terms_display|escape|default:'Efectivo' }}"
+                data-credit="{{ item.profile.credit_limit|default:'0.00' }}"
+                data-notes="{{ item.profile.notes|escape|default:'Sin observaciones' }}"
+                data-active="{% if item.is_active %}Sí{% else %}No{% endif %}"
+                data-created="{{ item.created_at|date:'d/m/Y H:i' }}">
+          Ver
+        </button>
+      </td>
       <td>{{ item.dni }}</td>
       <td>{{ item.last_name }}</td>
       <td>{{ item.first_name }}</td>
@@ -51,9 +70,112 @@
     </tr>
     {% empty %}
     <tr>
-      <td colspan="6" class="text-center">Cliente no encontrado.</td>
+      <td colspan="7" class="text-center">Cliente no encontrado.</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Modal de Detalles del Cliente -->
+<div class="modal fade" id="customerDetailModal" tabindex="-1" aria-labelledby="customerDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="modal-title" id="customerDetailModalLabel"><i class="bi bi-info-circle-fill me-2"></i>Detalles del Cliente</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <h3 class="text-primary mb-3" id="modalCustomerName">Nombre del Cliente</h3>
+        
+        <div class="row g-3">
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Identificación (DNI/RUC)</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerDni">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Correo electrónico</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerEmail">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Teléfono/Celular</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerPhone">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Estado</span>
+            <span class="badge" id="modalCustomerActive">Activo</span>
+          </div>
+          
+          <div class="col-12 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Dirección</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerAddress">-</span>
+          </div>
+          
+          <div class="col-md-6 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Tipo de Contribuyente</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerTaxpayer">-</span>
+          </div>
+          <div class="col-md-6 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Términos de Pago</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerPayment">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Límite de Crédito</span>
+            <span class="fs-5 fw-bold text-success" id="modalCustomerCredit">$0.00</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Fecha Registro</span>
+            <span class="fs-6 fw-semibold" id="modalCustomerCreated">-</span>
+          </div>
+          
+          <div class="col-12 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Observaciones / Notas</span>
+            <p class="text-muted mb-0" id="modalCustomerNotes">Sin observaciones...</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background-color: #f8f9fa; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn btn-secondary" style="border-radius: 8px;" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = new bootstrap.Modal(document.getElementById('customerDetailModal'));
+  
+  document.querySelectorAll('.btn-view-customer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const dni = this.getAttribute('data-dni');
+      const name = this.getAttribute('data-name');
+      const email = this.getAttribute('data-email');
+      const phone = this.getAttribute('data-phone');
+      const address = this.getAttribute('data-address');
+      const taxpayer = this.getAttribute('data-taxpayer');
+      const payment = this.getAttribute('data-payment');
+      const credit = this.getAttribute('data-credit');
+      const notes = this.getAttribute('data-notes');
+      const active = this.getAttribute('data-active');
+      const created = this.getAttribute('data-created');
+      
+      document.getElementById('modalCustomerName').innerText = name;
+      document.getElementById('modalCustomerDni').innerText = dni;
+      document.getElementById('modalCustomerEmail').innerText = email;
+      document.getElementById('modalCustomerPhone').innerText = phone;
+      document.getElementById('modalCustomerAddress').innerText = address;
+      document.getElementById('modalCustomerTaxpayer').innerText = taxpayer;
+      document.getElementById('modalCustomerPayment').innerText = payment;
+      document.getElementById('modalCustomerCredit').innerText = `$${parseFloat(credit).toFixed(2)}`;
+      document.getElementById('modalCustomerNotes').innerText = notes;
+      document.getElementById('modalCustomerCreated').innerText = created;
+      
+      const activeBadge = document.getElementById('modalCustomerActive');
+      activeBadge.innerText = active === 'Sí' ? 'Activo' : 'Inactivo';
+      activeBadge.className = active === 'Sí' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+      
+      modal.show();
+    });
+  });
+});
+</script>
 {% endblock %}

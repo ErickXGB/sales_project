@@ -18,13 +18,16 @@
   </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
   <a href="{% url 'billing:productgroup_create' %}" class="btn btn-success">+ Nuevo Grupo de Productos</a>
+  <a href="{% url 'billing:productgroup_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
+  <a href="{% url 'billing:productgroup_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
 </div>
 
 <table class="table table-striped table-hover">
   <thead class="table-dark">
     <tr>
+      <th>Ver</th>
       <th>Nombre</th>
       <th>Estado</th>
       <th>Acciones</th>
@@ -33,6 +36,14 @@
   <tbody>
     {% for item in items %}
     <tr>
+      <td>
+        <button type="button" class="btn btn-sm btn-info text-white btn-view-group"
+                data-name="{{ item.name|escape }}"
+                data-active="{% if item.is_active %}Sí{% else %}No{% endif %}"
+                data-created="{{ item.created_at|date:'d/m/Y H:i' }}">
+          Ver
+        </button>
+      </td>
       <td>{{ item.name }}</td>
       <td>
         {% if item.is_active %}
@@ -48,9 +59,61 @@
     </tr>
     {% empty %}
     <tr>
-      <td colspan="3" class="text-center">Categoría o grupo no encontrado.</td>
+      <td colspan="4" class="text-center">Categoría o grupo no encontrado.</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Modal de Detalles del Grupo -->
+<div class="modal fade" id="groupDetailModal" tabindex="-1" aria-labelledby="groupDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="modal-title" id="groupDetailModalLabel"><i class="bi bi-info-circle-fill me-2"></i>Detalles del Grupo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <h3 class="text-primary mb-3" id="modalGroupName">Nombre del Grupo</h3>
+        
+        <div class="row g-3">
+          <div class="col-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Estado</span>
+            <span class="badge" id="modalGroupActive">Activo</span>
+          </div>
+          <div class="col-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Fecha Creación</span>
+            <span class="fs-6 fw-semibold" id="modalGroupCreated">-</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background-color: #f8f9fa; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn btn-secondary" style="border-radius: 8px;" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = new bootstrap.Modal(document.getElementById('groupDetailModal'));
+  
+  document.querySelectorAll('.btn-view-group').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const name = this.getAttribute('data-name');
+      const active = this.getAttribute('data-active');
+      const created = this.getAttribute('data-created');
+      
+      document.getElementById('modalGroupName').innerText = name;
+      document.getElementById('modalGroupCreated').innerText = created;
+      
+      const activeBadge = document.getElementById('modalGroupActive');
+      activeBadge.innerText = active === 'Sí' ? 'Activo' : 'Inactivo';
+      activeBadge.className = active === 'Sí' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+      
+      modal.show();
+    });
+  });
+});
+</script>
 {% endblock %}

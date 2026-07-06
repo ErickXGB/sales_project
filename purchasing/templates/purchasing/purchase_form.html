@@ -234,7 +234,7 @@
         <input type="number" name="quantity[]" class="form-control quantity-input" min="1" value="${quantity}" required>
       </td>
       <td>
-        <input type="number" name="unit_cost[]" class="form-control cost-input bg-light" step="0.01" min="0" value="${parseFloat(cost).toFixed(2)}" readonly required>
+        <input type="number" name="unit_cost[]" class="form-control cost-input" step="0.01" min="0" value="${parseFloat(cost).toFixed(2)}" required>
       </td>
       <td class="text-end align-middle fw-bold row-subtotal" style="font-size: 1.1em;">
         $0.00
@@ -270,6 +270,7 @@
     });
 
     qtyInput.addEventListener('input', calculateTotals);
+    costInput.addEventListener('input', calculateTotals);
 
     removeBtn.addEventListener('click', function () {
       tr.remove();

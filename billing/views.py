@@ -12,9 +12,9 @@ from decimal import Decimal
 import json
 from .models import *
 from .forms import SignUpForm, BrandForm, ProductGroupForm, SupplierForm, ProductForm, CustomerForm, InvoiceForm, InvoiceDetailFormSet
-from shared.mixins import StaffRequiredMixin
+from shared.mixins import StaffRequiredMixin, GroupRequiredMixin
 from django.utils.decorators import method_decorator
-from shared.decorators import audit_action
+from shared.decorators import audit_action, group_required
 
 # === REGISTRO ===
 class SignUpView(CreateView):
@@ -42,6 +42,7 @@ def home(request):
 
 # === BRAND (FBV) ===
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 @audit_action('LIST_BRANDS')  
 def brand_list(request):
     search_field = request.GET.get('search_field', 'all').strip()
@@ -77,18 +78,20 @@ def brand_list(request):
     })
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 @audit_action('CREATE_BRAND')  
 def brand_create(request):
     if request.method == 'POST':
         form = BrandForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Brand created!')
+            messages.success(request, '¡Marca creada con éxito!')
             return redirect('billing:brand_list')
     else: form = BrandForm()
-    return render(request, 'billing/brand_form.html', {'form':form, 'title':'Create Brand'})
+    return render(request, 'billing/brand_form.html', {'form':form, 'title':'Crear Marca'})
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 @audit_action('UPDATE_BRAND')  
 def brand_update(request, pk):
     brand = get_object_or_404(Brand, pk=pk)
@@ -96,18 +99,19 @@ def brand_update(request, pk):
         form = BrandForm(request.POST, instance=brand)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Brand updated!')
+            messages.success(request, '¡Marca actualizada con éxito!')
             return redirect('billing:brand_list')
     else: form = BrandForm(instance=brand)
-    return render(request, 'billing/brand_form.html', {'form':form, 'title':'Edit Brand'})
+    return render(request, 'billing/brand_form.html', {'form':form, 'title':'Editar Marca'})
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 @audit_action('DELETE_BRAND')  
 def brand_delete(request, pk):
     brand = get_object_or_404(Brand, pk=pk)
     if request.method == 'POST':
         brand.delete()
-        messages.success(request, 'Brand deleted!')
+        messages.success(request, '¡Marca eliminada con éxito!')
         return redirect('billing:brand_list')
     return render(request, 'billing/brand_confirm_delete.html', {'object': brand})
 
@@ -117,6 +121,7 @@ def brand_delete(request, pk):
 # =============================================
 
 @login_required
+@group_required('Vendedor', 'Administrador')
 def invoice_list(request):
     """Lista todas las facturas con sus totales."""
     invoices = Invoice.objects.select_related('customer').all()
@@ -124,6 +129,7 @@ def invoice_list(request):
 
 
 @login_required
+@group_required('Vendedor', 'Administrador')
 def invoice_create(request):
     """Crea factura con sus líneas de detalle."""
     if request.method == 'POST':
@@ -160,6 +166,7 @@ def invoice_create(request):
 
 
 @login_required
+@group_required('Vendedor', 'Administrador')
 def invoice_detail(request, pk):
     """Muestra el detalle completo de una factura."""
     invoice = get_object_or_404(
@@ -171,6 +178,7 @@ def invoice_detail(request, pk):
 
 
 @login_required
+@group_required('Vendedor', 'Administrador')
 def invoice_delete(request, pk):
     """Elimina una factura y todos sus detalles (CASCADE)."""
     invoice = get_object_or_404(Invoice, pk=pk)
@@ -183,7 +191,8 @@ def invoice_delete(request, pk):
 
 
 # === PRODUCTGROUP (CBV) ===
-class ProductGroupListView(LoginRequiredMixin, ListView):
+class ProductGroupListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = ProductGroup
     template_name = 'billing/productgroup_list.html'
     context_object_name = 'items'
@@ -218,11 +227,14 @@ class ProductGroupListView(LoginRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class ProductGroupCreateView(LoginRequiredMixin, CreateView):
+class ProductGroupCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = ProductGroup; form_class = ProductGroupForm; template_name = 'billing/productgroup_form.html'; success_url = reverse_lazy('billing:productgroup_list')
-class ProductGroupUpdateView(LoginRequiredMixin, UpdateView):
+class ProductGroupUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = ProductGroup; form_class = ProductGroupForm; template_name = 'billing/productgroup_form.html'; success_url = reverse_lazy('billing:productgroup_list')
-class ProductGroupDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
+class ProductGroupDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = ProductGroup
     template_name = 'billing/productgroup_confirm_delete.html'
     success_url = reverse_lazy('billing:productgroup_list')
@@ -230,7 +242,8 @@ class ProductGroupDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView)
 
 
 # === SUPPLIER (CBV) ===
-class SupplierListView(LoginRequiredMixin, ListView):
+class SupplierListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Supplier
     template_name = 'billing/supplier_list.html'
     context_object_name = 'items'
@@ -274,18 +287,22 @@ class SupplierListView(LoginRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class SupplierCreateView(LoginRequiredMixin, CreateView):
+class SupplierCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Supplier; form_class = SupplierForm; template_name = 'billing/supplier_form.html'; success_url = reverse_lazy('billing:supplier_list')
-class SupplierUpdateView(LoginRequiredMixin, UpdateView):
+class SupplierUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Supplier; form_class = SupplierForm; template_name = 'billing/supplier_form.html'; success_url = reverse_lazy('billing:supplier_list')
-class SupplierDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
+class SupplierDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Supplier
     template_name = 'billing/supplier_confirm_delete.html'
     success_url = reverse_lazy('billing:supplier_list')
     staff_redirect_url = '/suppliers/'
 
 # === PRODUCT (CBV) ===
-class ProductListView(LoginRequiredMixin, ListView):
+class ProductListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Product
     template_name = 'billing/product_list.html'
     context_object_name = 'items'
@@ -351,18 +368,22 @@ class ProductListView(LoginRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class ProductCreateView(LoginRequiredMixin, CreateView):
+class ProductCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Product; form_class = ProductForm; template_name = 'billing/product_form.html'; success_url = reverse_lazy('billing:product_list')
-class ProductUpdateView(LoginRequiredMixin, UpdateView):
+class ProductUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Product; form_class = ProductForm; template_name = 'billing/product_form.html'; success_url = reverse_lazy('billing:product_list')
-class ProductDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
+class ProductDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
+    group_required = ['Analista de Compras', 'Administrador']
     model = Product
     template_name = 'billing/product_confirm_delete.html'
     success_url = reverse_lazy('billing:product_list')
     staff_redirect_url = '/products/'
 
 # === CUSTOMER (CBV) ===
-class CustomerListView(LoginRequiredMixin, ListView):
+class CustomerListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+    group_required = ['Vendedor', 'Administrador']
     model = Customer
     template_name = 'billing/customer_list.html'
     context_object_name = 'items'
@@ -408,18 +429,22 @@ class CustomerListView(LoginRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class CustomerCreateView(LoginRequiredMixin, CreateView):
+class CustomerCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
+    group_required = ['Vendedor', 'Administrador']
     model = Customer; form_class = CustomerForm; template_name = 'billing/customer_form.html'; success_url = reverse_lazy('billing:customer_list')
-class CustomerUpdateView(LoginRequiredMixin, UpdateView):
+class CustomerUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
+    group_required = ['Vendedor', 'Administrador']
     model = Customer; form_class = CustomerForm; template_name = 'billing/customer_form.html'; success_url = reverse_lazy('billing:customer_list')
-class CustomerDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
+class CustomerDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
+    group_required = ['Vendedor', 'Administrador']
     model = Customer
     template_name = 'billing/customer_confirm_delete.html'
     success_url = reverse_lazy('billing:customer_list')
     staff_redirect_url = '/customers/'
 
 # === INVOICE (CBV) ===
-class InvoiceListView(LoginRequiredMixin, ListView):
+class InvoiceListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
+    group_required = ['Vendedor', 'Administrador']
     model = Invoice
     template_name = 'billing/invoice_list.html'
     context_object_name = 'items'
@@ -475,7 +500,8 @@ class InvoiceListView(LoginRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class InvoiceCreateView(LoginRequiredMixin, View):
+class InvoiceCreateView(LoginRequiredMixin, GroupRequiredMixin, View):
+    group_required = ['Vendedor', 'Administrador']
     def get(self, request, *args, **kwargs):
         customers = Customer.objects.filter(is_active=True).select_related('profile')
         products = Product.objects.filter(is_active=True).select_related('brand', 'group')
@@ -745,7 +771,8 @@ class InvoiceCreateView(LoginRequiredMixin, View):
             'selected_items_json': json.dumps(selected_items),
         }
         return render(request, 'billing/invoice_form.html', context)
-class InvoiceDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
+class InvoiceDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
+    group_required = ['Vendedor', 'Administrador']
     model = Invoice
     template_name = 'billing/invoice_confirm_delete.html'
     success_url = reverse_lazy('billing:invoice_list')
@@ -753,6 +780,7 @@ class InvoiceDeleteView(LoginRequiredMixin, StaffRequiredMixin, DeleteView):
 
 # === REPORTES DE PRODUCTOS (Excel / PDF) ===
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def product_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -849,6 +877,7 @@ def product_report_excel(request):
     return response
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def product_report_pdf(request):
     import io
     import datetime
@@ -990,3 +1019,963 @@ def product_report_pdf(request):
     
     buffer.seek(0)
     return FileResponse(buffer, as_attachment=True, filename="Reporte_Productos.pdf")
+
+
+# === REPORTES DE MARCAS (Excel / PDF) ===
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def brand_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Marcas"
+    ws.merge_cells("A1:D1")
+    ws["A1"] = "REPORTE GENERAL DE MARCAS"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+
+    headers = ["ID", "Nombre de Marca", "Descripción", "Estado"]
+    ws.append([])
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    for col in range(1, 5):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+
+    brands = Brand.objects.all().order_by('name')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for b in brands:
+        row = [
+            b.id,
+            b.name,
+            b.description or "",
+            "Activo" if b.is_active else "Inactivo"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=4).alignment = Alignment(horizontal="center")
+        for col in range(1, 5):
+            c = ws.cell(row=curr_row, column=col)
+            c.font = Font(name="Calibri", size=11)
+            c.border = thin_border
+
+    ws.auto_filter.ref = f"A3:D{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Marcas.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def brand_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE MARCAS", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Total de marcas registradas.", subtitle_style))
+
+    brands = Brand.objects.all().order_by('name')
+
+    data = [
+        [
+            Paragraph("ID", cell_header_style),
+            Paragraph("Nombre de Marca", cell_header_style),
+            Paragraph("Descripción", cell_header_style),
+            Paragraph("Estado", cell_header_style)
+        ]
+    ]
+
+    for b in brands:
+        data.append([
+            Paragraph(f"#{b.id}", cell_text_center),
+            Paragraph(b.name, cell_text_left),
+            Paragraph(b.description or "", cell_text_left),
+            Paragraph("Activo" if b.is_active else "Inactivo", cell_text_center)
+        ])
+
+    col_widths = [50, 150, 240, 100]
+
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    story.append(t)
+    doc.build(story, canvasmaker=NumberedCanvas)
+
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Marcas.pdf")
+
+
+# === REPORTES DE CATEGORIAS / GRUPOS (Excel / PDF) ===
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def productgroup_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Grupos"
+    ws.merge_cells("A1:C1")
+    ws["A1"] = "REPORTE GENERAL DE GRUPOS DE PRODUCTOS"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+
+    headers = ["ID", "Nombre de Grupo", "Estado"]
+    ws.append([])
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    for col in range(1, 4):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+
+    groups = ProductGroup.objects.all().order_by('name')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for g in groups:
+        row = [
+            g.id,
+            g.name,
+            "Activo" if g.is_active else "Inactivo"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
+        for col in range(1, 4):
+            c = ws.cell(row=curr_row, column=col)
+            c.font = Font(name="Calibri", size=11)
+            c.border = thin_border
+
+    ws.auto_filter.ref = f"A3:C{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Grupos.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def productgroup_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE GRUPOS DE PRODUCTOS", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Total de categorías/grupos registrados.", subtitle_style))
+
+    groups = ProductGroup.objects.all().order_by('name')
+
+    data = [
+        [
+            Paragraph("ID", cell_header_style),
+            Paragraph("Nombre de Grupo", cell_header_style),
+            Paragraph("Estado", cell_header_style)
+        ]
+    ]
+
+    for g in groups:
+        data.append([
+            Paragraph(f"#{g.id}", cell_text_center),
+            Paragraph(g.name, cell_text_left),
+            Paragraph("Activo" if g.is_active else "Inactivo", cell_text_center)
+        ])
+
+    col_widths = [80, 320, 140]
+
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    story.append(t)
+    doc.build(story, canvasmaker=NumberedCanvas)
+
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Grupos.pdf")
+
+
+# === REPORTES DE PROVEEDORES (Excel / PDF) ===
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def supplier_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Proveedores"
+    ws.merge_cells("A1:G1")
+    ws["A1"] = "REPORTE GENERAL DE PROVEEDORES"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+
+    headers = ["ID", "Razón Social", "Contacto", "Email", "Teléfono", "Dirección", "Estado"]
+    ws.append([])
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    for col in range(1, 8):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+
+    suppliers = Supplier.objects.all().order_by('name')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for s in suppliers:
+        row = [
+            s.id,
+            s.name,
+            s.contact_name or "",
+            s.email or "",
+            s.phone or "",
+            s.address or "",
+            "Activo" if s.is_active else "Inactivo"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=7).alignment = Alignment(horizontal="center")
+        for col in range(1, 8):
+            c = ws.cell(row=curr_row, column=col)
+            c.font = Font(name="Calibri", size=11)
+            c.border = thin_border
+
+    ws.auto_filter.ref = f"A3:G{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Proveedores.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def supplier_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE PROVEEDORES", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Total de proveedores registrados.", subtitle_style))
+
+    suppliers = Supplier.objects.all().order_by('name')
+
+    data = [
+        [
+            Paragraph("ID", cell_header_style),
+            Paragraph("Razón Social", cell_header_style),
+            Paragraph("Contacto", cell_header_style),
+            Paragraph("Email", cell_header_style),
+            Paragraph("Teléfono", cell_header_style),
+            Paragraph("Estado", cell_header_style)
+        ]
+    ]
+
+    for s in suppliers:
+        data.append([
+            Paragraph(f"#{s.id}", cell_text_center),
+            Paragraph(s.name, cell_text_left),
+            Paragraph(s.contact_name or "", cell_text_left),
+            Paragraph(s.email or "", cell_text_left),
+            Paragraph(s.phone or "", cell_text_center),
+            Paragraph("Activo" if s.is_active else "Inactivo", cell_text_center)
+        ])
+
+    col_widths = [40, 140, 100, 130, 80, 50]
+
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    story.append(t)
+    doc.build(story, canvasmaker=NumberedCanvas)
+
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Proveedores.pdf")
+
+
+# === REPORTES DE CLIENTES (Excel / PDF) ===
+@login_required
+@group_required('Vendedor', 'Administrador')
+def customer_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Clientes"
+    ws.merge_cells("A1:G1")
+    ws["A1"] = "REPORTE GENERAL DE CLIENTES"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+
+    headers = ["ID", "DNI/RUC", "Nombre Completo", "Email", "Teléfono", "Dirección", "Estado"]
+    ws.append([])
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    for col in range(1, 8):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+
+    customers = Customer.objects.all().order_by('last_name', 'first_name')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for c in customers:
+        row = [
+            c.id,
+            c.dni,
+            c.full_name,
+            c.email or "",
+            c.phone or "",
+            c.address or "",
+            "Activo" if c.is_active else "Inactivo"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=2).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=7).alignment = Alignment(horizontal="center")
+        for col in range(1, 8):
+            cell_obj = ws.cell(row=curr_row, column=col)
+            cell_obj.font = Font(name="Calibri", size=11)
+            cell_obj.border = thin_border
+
+    ws.auto_filter.ref = f"A3:G{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Clientes.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Vendedor', 'Administrador')
+def customer_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE CLIENTES", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Total de clientes registrados.", subtitle_style))
+
+    customers = Customer.objects.all().order_by('last_name', 'first_name')
+
+    data = [
+        [
+            Paragraph("DNI/RUC", cell_header_style),
+            Paragraph("Nombre Completo", cell_header_style),
+            Paragraph("Email", cell_header_style),
+            Paragraph("Teléfono", cell_header_style),
+            Paragraph("Dirección", cell_header_style),
+            Paragraph("Estado", cell_header_style)
+        ]
+    ]
+
+    for c in customers:
+        data.append([
+            Paragraph(c.dni, cell_text_center),
+            Paragraph(c.full_name, cell_text_left),
+            Paragraph(c.email or "", cell_text_left),
+            Paragraph(c.phone or "", cell_text_center),
+            Paragraph(c.address or "", cell_text_left),
+            Paragraph("Activo" if c.is_active else "Inactivo", cell_text_center)
+        ])
+
+    col_widths = [90, 140, 130, 80, 55, 45]
+
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    story.append(t)
+    doc.build(story, canvasmaker=NumberedCanvas)
+
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Clientes.pdf")
+
+
+# === REPORTES DE FACTURAS (Excel / PDF) ===
+@login_required
+@group_required('Vendedor', 'Administrador')
+def invoice_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Facturas"
+    ws.merge_cells("A1:G1")
+    ws["A1"] = "REPORTE GENERAL DE FACTURAS EMITIDAS"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+
+    headers = ["ID Factura", "Cliente", "Fecha de Emisión", "Subtotal (USD)", "IVA (15%)", "Total (USD)", "Estado"]
+    ws.append([])
+    ws.append(headers)
+
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    for col in range(1, 8):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+
+    invoices = Invoice.objects.select_related('customer').all().order_by('-invoice_date')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for i in invoices:
+        row = [
+            i.id,
+            i.customer.full_name,
+            i.invoice_date.strftime("%d/%m/%Y %H:%M"),
+            float(i.subtotal),
+            float(i.tax),
+            float(i.total),
+            "Activo" if i.is_active else "Anulado"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        ws.cell(row=curr_row, column=1).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=3).alignment = Alignment(horizontal="center")
+        ws.cell(row=curr_row, column=7).alignment = Alignment(horizontal="center")
+        
+        ws.cell(row=curr_row, column=4).number_format = '$#,##0.00'
+        ws.cell(row=curr_row, column=5).number_format = '$#,##0.00'
+        ws.cell(row=curr_row, column=6).number_format = '$#,##0.00'
+        ws.cell(row=curr_row, column=4).alignment = Alignment(horizontal="right")
+        ws.cell(row=curr_row, column=5).alignment = Alignment(horizontal="right")
+        ws.cell(row=curr_row, column=6).alignment = Alignment(horizontal="right")
+
+        for col in range(1, 8):
+            c = ws.cell(row=curr_row, column=col)
+            c.font = Font(name="Calibri", size=11)
+            c.border = thin_border
+
+    ws.auto_filter.ref = f"A3:G{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if cell.column in [4, 5, 6] and isinstance(cell.value, (int, float)):
+                val_str = f"${cell.value:,.2f}"
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Facturas.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Vendedor', 'Administrador')
+def invoice_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+
+    story = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+    cell_text_right = ParagraphStyle(
+        'CellTextRight',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        textColor=colors.HexColor("#262626"),
+        alignment=2
+    )
+
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE FACTURAS", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Historial de facturas emitidas.", subtitle_style))
+
+    invoices = Invoice.objects.select_related('customer').all().order_by('-invoice_date')
+
+    data = [
+        [
+            Paragraph("Factura #", cell_header_style),
+            Paragraph("Cliente", cell_header_style),
+            Paragraph("Fecha de Emisión", cell_header_style),
+            Paragraph("Subtotal", cell_header_style),
+            Paragraph("IVA (15%)", cell_header_style),
+            Paragraph("Total", cell_header_style),
+            Paragraph("Estado", cell_header_style)
+        ]
+    ]
+
+    for i in invoices:
+        data.append([
+            Paragraph(f"#{i.id}", cell_text_center),
+            Paragraph(i.customer.full_name, cell_text_left),
+            Paragraph(i.invoice_date.strftime("%d/%m/%Y %H:%M"), cell_text_center),
+            Paragraph(f"${i.subtotal:,.2f}", cell_text_right),
+            Paragraph(f"${i.tax:,.2f}", cell_text_right),
+            Paragraph(f"${i.total:,.2f}", cell_text_right),
+            Paragraph("Activo" if i.is_active else "Anulado", cell_text_center)
+        ])
+
+    col_widths = [55, 140, 95, 90, 50, 50, 60]
+
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+
+    story.append(t)
+    doc.build(story, canvasmaker=NumberedCanvas)
+
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Facturas.pdf")

@@ -1,5 +1,5 @@
 {% extends 'billing/base.html' %}
-{% block title %}Products{% endblock %}
+{% block title %}Productos{% endblock %}
 {% block content %}
 <h2>Productos</h2>
 
@@ -142,7 +142,7 @@
               </div>
               <div class="col-12 border-top pt-2">
                 <span class="text-secondary small d-block fw-bold text-uppercase">Proveedores</span>
-                <div id="modalProductSuppliers" class="mt-1">
+                <div id="modalProductProveedores" class="mt-1">
                   <!-- Se inyectan badges de proveedores -->
                 </div>
               </div>
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       
       // Proveedores (badges)
-      const suppliersDiv = document.getElementById('modalProductSuppliers');
+      const suppliersDiv = document.getElementById('modalProductProveedores');
       suppliersDiv.innerHTML = '';
       if (suppliers && suppliers !== 'Sin proveedores') {
         suppliers.split(',').forEach(s => {

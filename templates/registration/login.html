@@ -1,29 +1,45 @@
 {% extends 'billing/base.html' %}
-{% block title %}Login{% endblock %}
+{% block title %}Iniciar Sesión{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-5">
-    <div class="card shadow">
-      <div class="card-header bg-dark text-white"><h4>Iniciar Sesión</h4></div>
-      <div class="card-body">
+    <div class="card shadow border-0" style="border-radius: 12px;">
+      <div class="card-header bg-dark text-white text-center py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+        <h4 class="mb-0"><i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión</h4>
+      </div>
+      <div class="card-body p-4">
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger shadow-sm alert-dismissible fade show" role="alert">
+          {% for error in form.non_field_errors %}
+          <div><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}</div>
+          {% endfor %}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        {% endif %}
+
         <form method="post">
           {% csrf_token %}
           {% for field in form %}
           <div class="mb-3">
-            <label class="form-label">{{ field.label }}</label>
-            <input type="{{ field.field.widget.input_type }}"
+            <label class="form-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <input type="{% if field.name == 'password' %}password{% else %}text{% endif %}"
                    name="{{ field.html_name }}"
+                   id="{{ field.id_for_label }}"
                    class="form-control {% if field.errors %}is-invalid{% endif %}"
-                   value="{{ field.value|default_if_none:'' }}">
+                   placeholder="{{ field.label }}"
+                   {% if field.value %}value="{{ field.value }}"{% endif %}
+                   required>
             {% for error in field.errors %}
-            <div class="invalid-feedback">{{ error }}</div>
+            <div class="invalid-feedback d-block"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
             {% endfor %}
           </div>
           {% endfor %}
-          <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+          <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mt-2 shadow-sm" style="border-radius: 8px;">
+            Iniciar Sesión
+          </button>
         </form>
-        <p class="mt-3 text-center">
-          ¿No tienes una cuenta? <a href="{% url 'billing:signup' %}">Registrarse</a>
+        <p class="mt-4 text-center text-muted mb-0">
+          ¿No tienes una cuenta? <a href="{% url 'security:register' %}" class="text-decoration-none fw-bold">Registrarse</a>
         </p>
       </div>
     </div>

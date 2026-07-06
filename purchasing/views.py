@@ -1,3 +1,4 @@
+from shared.decorators import group_required
 import json
 import re
 from django.shortcuts import render, redirect, get_object_or_404
@@ -10,6 +11,7 @@ from billing.models import Supplier, Product
 from .models import Purchase, PurchaseDetail
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def purchase_list(request):
     """Lista todas las compras con búsqueda por campo (igual que product_list)."""
     purchases = Purchase.objects.select_related('supplier').all()
@@ -46,6 +48,7 @@ def purchase_list(request):
     return render(request, 'purchasing/purchase_list.html', context)
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def purchase_create(request):
     """Crea una compra con sus detalles usando entrada dinámica (JS)."""
     if request.method == 'POST':
@@ -260,6 +263,7 @@ def _render_form_with_errors(request, supplier_select, supplier_name, supplier_c
     })
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def purchase_detail(request, pk):
     """Detalle de una compra con prefetch_related('details__product')."""
     purchase = get_object_or_404(
@@ -269,6 +273,7 @@ def purchase_detail(request, pk):
     return render(request, 'purchasing/purchase_detail.html', {'purchase': purchase})
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def purchase_delete(request, pk):
     """Elimina una compra y todos sus detalles (CASCADE)."""
     purchase = get_object_or_404(Purchase, pk=pk)
@@ -280,6 +285,7 @@ def purchase_delete(request, pk):
     return render(request, 'purchasing/purchase_confirm_delete.html', {'object': purchase})
 
 @login_required
+@group_required('Analista de Compras', 'Administrador')
 def purchase_report(request):
     """Reporte de costo promedio por producto."""
     products = Product.objects.annotate(
@@ -293,5 +299,267 @@ def purchase_report(request):
         'overall_avg': overall_avg,
     }
     return render(request, 'purchasing/purchase_report.html', context)
+
+
+# === REPORTES GENÉRICOS HELPERS ===
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+
+class GlobalNumberedCanvas(canvas.Canvas):
+    report_title = "Sistema de Ventas - Reporte de Compras"
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_number(num_pages)
+            super().showPage()
+        super().save()
+
+    def draw_page_number(self, page_count):
+        self.saveState()
+        self.setFont("Helvetica", 9)
+        self.setFillColor(colors.HexColor("#7F7F7F"))
+        self.setStrokeColor(colors.HexColor("#D9D9D9"))
+        self.setLineWidth(0.5)
+        self.line(36, 756, 576, 756)
+        self.drawString(36, 762, self.report_title)
+        self.line(36, 54, 576, 54)
+        page_text = f"Página {self._pageNumber} de {page_count}"
+        self.drawRightString(576, 42, page_text)
+        self.drawString(36, 42, "Reporte generado automáticamente")
+        self.restoreState()
+
+def get_numbered_canvas_class(title):
+    class DynamicNumberedCanvas(GlobalNumberedCanvas):
+        report_title = title
+    return DynamicNumberedCanvas
+
+
+# === REPORTES DE COMPRAS (Excel / PDF) ===
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def purchase_report_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Compras"
+    
+    ws.merge_cells("A1:H1")
+    ws["A1"] = "REPORTE GENERAL DE COMPRAS (ADQUISICIONES)"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+    
+    headers = ["ID Compra", "Proveedor", "Nº Factura Proveedor", "Fecha Adquisición", "Subtotal (USD)", "IVA (15%)", "Total (USD)", "Estado"]
+    ws.append([])
+    ws.append(headers)
+    
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    center_align = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center")
+    right_align = Alignment(horizontal="right", vertical="center")
+    
+    for col in range(1, 9):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_align
+    ws.row_dimensions[3].height = 25
+    
+    purchases = Purchase.objects.select_related('supplier').all().order_by('-purchase_date')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    
+    for p in purchases:
+        row = [
+            p.id,
+            p.supplier.name,
+            p.document_number,
+            p.purchase_date.strftime("%d/%m/%Y %H:%M"),
+            float(p.subtotal),
+            float(p.tax),
+            float(p.total),
+            "Activo" if p.is_active else "Inactivo"
+        ]
+        ws.append(row)
+        curr_row = ws.max_row
+        ws.row_dimensions[curr_row].height = 20
+        
+        ws.cell(row=curr_row, column=1).alignment = center_align
+        ws.cell(row=curr_row, column=2).alignment = left_align
+        ws.cell(row=curr_row, column=3).alignment = center_align
+        ws.cell(row=curr_row, column=4).alignment = center_align
+        
+        for col in [5, 6, 7]:
+            val_cell = ws.cell(row=curr_row, column=col)
+            val_cell.alignment = right_align
+            val_cell.number_format = '$#,##0.00'
+            
+        ws.cell(row=curr_row, column=8).alignment = center_align
+        
+        for col in range(1, 9):
+            c = ws.cell(row=curr_row, column=col)
+            c.font = Font(name="Calibri", size=11)
+            c.border = thin_border
+            
+    ws.auto_filter.ref = f"A3:H{ws.max_row}"
+    for col in ws.columns:
+        max_len = 0
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row == 1:
+                continue
+            val_str = str(cell.value or '')
+            if cell.column in [5, 6, 7] and isinstance(cell.value, (int, float)):
+                val_str = f"${cell.value:,.2f}"
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+        
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="Reporte_Compras.xlsx"'
+    wb.save(response)
+    return response
+
+
+@login_required
+@group_required('Analista de Compras', 'Administrador')
+def purchase_report_pdf(request):
+    import io
+    import datetime
+    from django.http import FileResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=72
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=22,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#595959"),
+        spaceAfter=25
+    )
+    cell_header_style = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.white,
+        alignment=1
+    )
+    cell_text_left = ParagraphStyle(
+        'CellTextLeft',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626")
+    )
+    cell_text_center = ParagraphStyle(
+        'CellTextCenter',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626"),
+        alignment=1
+    )
+    cell_text_right = ParagraphStyle(
+        'CellTextRight',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor("#262626"),
+        alignment=2
+    )
+    
+    now_str = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    story.append(Paragraph("REPORTE GENERAL DE COMPRAS (ADQUISICIONES)", title_style))
+    story.append(Paragraph(f"Fecha de Generación: {now_str} | Historial de compras registradas.", subtitle_style))
+    
+    purchases = Purchase.objects.select_related('supplier').all().order_by('-purchase_date')
+    
+    data = [
+        [
+            Paragraph("ID Compra", cell_header_style),
+            Paragraph("Proveedor", cell_header_style),
+            Paragraph("Nº Factura Prov.", cell_header_style),
+            Paragraph("Fecha", cell_header_style),
+            Paragraph("Subtotal", cell_header_style),
+            Paragraph("IVA (15%)", cell_header_style),
+            Paragraph("Total", cell_header_style)
+        ]
+    ]
+    
+    for p in purchases:
+        data.append([
+            Paragraph(f"#{p.id}", cell_text_center),
+            Paragraph(p.supplier.name, cell_text_left),
+            Paragraph(p.document_number, cell_text_center),
+            Paragraph(p.purchase_date.strftime("%d/%m/%Y %H:%M"), cell_text_center),
+            Paragraph(f"${p.subtotal:,.2f}", cell_text_right),
+            Paragraph(f"${p.tax:,.2f}", cell_text_right),
+            Paragraph(f"${p.total:,.2f}", cell_text_right)
+        ])
+        
+    col_widths = [55, 140, 95, 90, 50, 50, 60]
+    
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor("#F2F4F7"), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0, 1), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+    ]))
+    
+    story.append(t)
+    canvas_class = get_numbered_canvas_class("Sistema de Ventas - Reporte de Compras")
+    doc.build(story, canvasmaker=canvas_class)
+    
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Reporte_Compras.pdf")
 
 

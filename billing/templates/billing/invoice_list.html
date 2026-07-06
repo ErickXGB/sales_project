@@ -22,8 +22,10 @@
   </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
   <a href="{% url 'billing:invoice_create' %}" class="btn btn-success">+ Nueva Factura</a>
+  <a href="{% url 'billing:invoice_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
+  <a href="{% url 'billing:invoice_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
 </div>
 
 <table class="table table-striped table-hover">

@@ -1,5 +1,5 @@
 {% extends 'billing/base.html' %}
-{% block title %}Suppliers{% endblock %}
+{% block title %}Proveedores{% endblock %}
 {% block content %}
 <h2>Proveedores</h2>
 
@@ -21,13 +21,16 @@
   </div>
 </form>
 
-<div class="mb-3">
+<div class="mb-3 d-flex gap-2">
   <a href="{% url 'billing:supplier_create' %}" class="btn btn-success">+ Nuevo Proveedor</a>
+  <a href="{% url 'billing:supplier_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
+  <a href="{% url 'billing:supplier_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
 </div>
 
 <table class="table table-striped table-hover">
   <thead class="table-dark">
     <tr>
+      <th>Ver</th>
       <th>Nombre</th>
       <th>Contacto</th>
       <th>Correo</th>
@@ -38,6 +41,18 @@
   <tbody>
     {% for item in items %}
     <tr>
+      <td>
+        <button type="button" class="btn btn-sm btn-info text-white btn-view-supplier"
+                data-name="{{ item.name|escape }}"
+                data-contact="{{ item.contact_name|escape|default:'-' }}"
+                data-email="{{ item.email|escape|default:'-' }}"
+                data-phone="{{ item.phone|escape|default:'-' }}"
+                data-address="{{ item.address|escape|default:'Sin dirección' }}"
+                data-active="{% if item.is_active %}Sí{% else %}No{% endif %}"
+                data-created="{{ item.created_at|date:'d/m/Y H:i' }}">
+          Ver
+        </button>
+      </td>
       <td>{{ item.name }}</td>
       <td>{{ item.contact_name }}</td>
       <td>{{ item.email }}</td>
@@ -49,9 +64,85 @@
     </tr>
     {% empty %}
     <tr>
-      <td colspan="5" class="text-center">Proveedor no encontrado.</td>
+      <td colspan="6" class="text-center">Proveedor no encontrado.</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Modal de Detalles del Proveedor -->
+<div class="modal fade" id="supplierDetailModal" tabindex="-1" aria-labelledby="supplierDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.15);">
+      <div class="modal-header text-white" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h5 class="modal-title" id="supplierDetailModalLabel"><i class="bi bi-info-circle-fill me-2"></i>Detalles del Proveedor</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <h3 class="text-primary mb-3" id="modalSupplierName">Nombre Empresa</h3>
+        
+        <div class="row g-3">
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Nombre de Contacto</span>
+            <span class="fs-6 fw-semibold" id="modalSupplierContact">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Correo electrónico</span>
+            <span class="fs-6 fw-semibold" id="modalSupplierEmail">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Teléfono/Celular</span>
+            <span class="fs-6 fw-semibold" id="modalSupplierPhone">-</span>
+          </div>
+          <div class="col-md-6">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Estado</span>
+            <span class="badge" id="modalSupplierActive">Activo</span>
+          </div>
+          <div class="col-12 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Dirección</span>
+            <span class="fs-6 fw-semibold" id="modalSupplierAddress">-</span>
+          </div>
+          <div class="col-6 border-top pt-2">
+            <span class="text-secondary small d-block fw-bold text-uppercase">Fecha Registro</span>
+            <span class="fs-6 fw-semibold" id="modalSupplierCreated">-</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="background-color: #f8f9fa; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+        <button type="button" class="btn btn-secondary" style="border-radius: 8px;" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = new bootstrap.Modal(document.getElementById('supplierDetailModal'));
+  
+  document.querySelectorAll('.btn-view-supplier').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const name = this.getAttribute('data-name');
+      const contact = this.getAttribute('data-contact');
+      const email = this.getAttribute('data-email');
+      const phone = this.getAttribute('data-phone');
+      const address = this.getAttribute('data-address');
+      const active = this.getAttribute('data-active');
+      const created = this.getAttribute('data-created');
+      
+      document.getElementById('modalSupplierName').innerText = name;
+      document.getElementById('modalSupplierContact').innerText = contact;
+      document.getElementById('modalSupplierEmail').innerText = email;
+      document.getElementById('modalSupplierPhone').innerText = phone;
+      document.getElementById('modalSupplierAddress').innerText = address;
+      document.getElementById('modalSupplierCreated').innerText = created;
+      
+      const activeBadge = document.getElementById('modalSupplierActive');
+      activeBadge.innerText = active === 'Sí' ? 'Activo' : 'Inactivo';
+      activeBadge.className = active === 'Sí' ? 'badge bg-success text-white' : 'badge bg-danger text-white';
+      
+      modal.show();
+    });
+  });
+});
+</script>
 {% endblock %}
