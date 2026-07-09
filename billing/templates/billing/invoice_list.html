@@ -50,7 +50,8 @@
       <td class="text-end">${{ inv.tax }}</td>
       <td class="text-end fw-bold">${{ inv.total }}</td>
       <td>
-        <a href="{% url 'billing:invoice_detail' inv.pk %}" class="btn btn-sm btn-info">Ver</a>
+        <a href="{% url 'billing:invoice_detail' inv.pk %}" class="btn btn-sm btn-info text-white">Ver</a>
+        <a href="{% url 'billing:invoice_pdf' inv.pk %}" class="btn btn-sm btn-primary" title="Imprimir PDF"><i class="bi bi-printer"></i></a>
         <a href="{% url 'billing:invoice_delete' inv.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
       </td>
     </tr>

@@ -2,7 +2,7 @@ import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth import login
@@ -12,15 +12,20 @@ from decimal import Decimal
 import json
 from .models import *
 from .forms import SignUpForm, BrandForm, ProductGroupForm, SupplierForm, ProductForm, CustomerForm, InvoiceForm, InvoiceDetailFormSet
-from shared.mixins import StaffRequiredMixin, GroupRequiredMixin
+from shared.mixins import StaffRequiredMixin, PermissionRequiredMixin
 from django.utils.decorators import method_decorator
-from shared.decorators import audit_action, group_required
+from shared.decorators import audit_action, permission_required
 
 # === REGISTRO ===
-class SignUpView(CreateView):
+class SignUpView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     form_class = SignUpForm
     template_name = 'registration/signup.html'
     success_url = reverse_lazy('billing:brand_list')
+
+    def test_func(self):
+        # Desactivado para el público general; solo superusuarios (o admin) pueden acceder.
+        return self.request.user.is_superuser
+
     def form_valid(self, form):
         response = super().form_valid(form)
         login(self.request, self.object)
@@ -42,7 +47,7 @@ def home(request):
 
 # === BRAND (FBV) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_brand')
 @audit_action('LIST_BRANDS')  
 def brand_list(request):
     search_field = request.GET.get('search_field', 'all').strip()
@@ -78,7 +83,7 @@ def brand_list(request):
     })
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.add_brand')
 @audit_action('CREATE_BRAND')  
 def brand_create(request):
     if request.method == 'POST':
@@ -91,7 +96,7 @@ def brand_create(request):
     return render(request, 'billing/brand_form.html', {'form':form, 'title':'Crear Marca'})
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.change_brand')
 @audit_action('UPDATE_BRAND')  
 def brand_update(request, pk):
     brand = get_object_or_404(Brand, pk=pk)
@@ -105,7 +110,7 @@ def brand_update(request, pk):
     return render(request, 'billing/brand_form.html', {'form':form, 'title':'Editar Marca'})
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.delete_brand')
 @audit_action('DELETE_BRAND')  
 def brand_delete(request, pk):
     brand = get_object_or_404(Brand, pk=pk)
@@ -121,7 +126,7 @@ def brand_delete(request, pk):
 # =============================================
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_invoice')
 def invoice_list(request):
     """Lista todas las facturas con sus totales."""
     invoices = Invoice.objects.select_related('customer').all()
@@ -129,7 +134,7 @@ def invoice_list(request):
 
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.add_invoice')
 def invoice_create(request):
     """Crea factura con sus líneas de detalle."""
     if request.method == 'POST':
@@ -166,7 +171,7 @@ def invoice_create(request):
 
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_invoice')
 def invoice_detail(request, pk):
     """Muestra el detalle completo de una factura."""
     invoice = get_object_or_404(
@@ -178,7 +183,7 @@ def invoice_detail(request, pk):
 
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.delete_invoice')
 def invoice_delete(request, pk):
     """Elimina una factura y todos sus detalles (CASCADE)."""
     invoice = get_object_or_404(Invoice, pk=pk)
@@ -191,8 +196,8 @@ def invoice_delete(request, pk):
 
 
 # === PRODUCTGROUP (CBV) ===
-class ProductGroupListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductGroupListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'billing.view_productgroup'
     model = ProductGroup
     template_name = 'billing/productgroup_list.html'
     context_object_name = 'items'
@@ -227,14 +232,14 @@ class ProductGroupListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class ProductGroupCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductGroupCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'billing.add_productgroup'
     model = ProductGroup; form_class = ProductGroupForm; template_name = 'billing/productgroup_form.html'; success_url = reverse_lazy('billing:productgroup_list')
-class ProductGroupUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductGroupUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'billing.change_productgroup'
     model = ProductGroup; form_class = ProductGroupForm; template_name = 'billing/productgroup_form.html'; success_url = reverse_lazy('billing:productgroup_list')
-class ProductGroupDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductGroupDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequiredMixin, DeleteView):
+    permission_required = 'billing.delete_productgroup'
     model = ProductGroup
     template_name = 'billing/productgroup_confirm_delete.html'
     success_url = reverse_lazy('billing:productgroup_list')
@@ -242,8 +247,8 @@ class ProductGroupDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequir
 
 
 # === SUPPLIER (CBV) ===
-class SupplierListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
-    group_required = ['Analista de Compras', 'Administrador']
+class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'billing.view_supplier'
     model = Supplier
     template_name = 'billing/supplier_list.html'
     context_object_name = 'items'
@@ -287,22 +292,22 @@ class SupplierListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class SupplierCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class SupplierCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'billing.add_supplier'
     model = Supplier; form_class = SupplierForm; template_name = 'billing/supplier_form.html'; success_url = reverse_lazy('billing:supplier_list')
-class SupplierUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class SupplierUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'billing.change_supplier'
     model = Supplier; form_class = SupplierForm; template_name = 'billing/supplier_form.html'; success_url = reverse_lazy('billing:supplier_list')
-class SupplierDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
-    group_required = ['Analista de Compras', 'Administrador']
+class SupplierDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequiredMixin, DeleteView):
+    permission_required = 'billing.delete_supplier'
     model = Supplier
     template_name = 'billing/supplier_confirm_delete.html'
     success_url = reverse_lazy('billing:supplier_list')
     staff_redirect_url = '/suppliers/'
 
 # === PRODUCT (CBV) ===
-class ProductListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'billing.view_product'
     model = Product
     template_name = 'billing/product_list.html'
     context_object_name = 'items'
@@ -368,22 +373,22 @@ class ProductListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class ProductCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'billing.add_product'
     model = Product; form_class = ProductForm; template_name = 'billing/product_form.html'; success_url = reverse_lazy('billing:product_list')
-class ProductUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'billing.change_product'
     model = Product; form_class = ProductForm; template_name = 'billing/product_form.html'; success_url = reverse_lazy('billing:product_list')
-class ProductDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
-    group_required = ['Analista de Compras', 'Administrador']
+class ProductDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequiredMixin, DeleteView):
+    permission_required = 'billing.delete_product'
     model = Product
     template_name = 'billing/product_confirm_delete.html'
     success_url = reverse_lazy('billing:product_list')
     staff_redirect_url = '/products/'
 
 # === CUSTOMER (CBV) ===
-class CustomerListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
-    group_required = ['Vendedor', 'Administrador']
+class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'billing.view_customer'
     model = Customer
     template_name = 'billing/customer_list.html'
     context_object_name = 'items'
@@ -429,22 +434,22 @@ class CustomerListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class CustomerCreateView(LoginRequiredMixin, GroupRequiredMixin, CreateView):
-    group_required = ['Vendedor', 'Administrador']
+class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'billing.add_customer'
     model = Customer; form_class = CustomerForm; template_name = 'billing/customer_form.html'; success_url = reverse_lazy('billing:customer_list')
-class CustomerUpdateView(LoginRequiredMixin, GroupRequiredMixin, UpdateView):
-    group_required = ['Vendedor', 'Administrador']
+class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'billing.change_customer'
     model = Customer; form_class = CustomerForm; template_name = 'billing/customer_form.html'; success_url = reverse_lazy('billing:customer_list')
-class CustomerDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
-    group_required = ['Vendedor', 'Administrador']
+class CustomerDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequiredMixin, DeleteView):
+    permission_required = 'billing.delete_customer'
     model = Customer
     template_name = 'billing/customer_confirm_delete.html'
     success_url = reverse_lazy('billing:customer_list')
     staff_redirect_url = '/customers/'
 
 # === INVOICE (CBV) ===
-class InvoiceListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
-    group_required = ['Vendedor', 'Administrador']
+class InvoiceListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'billing.view_invoice'
     model = Invoice
     template_name = 'billing/invoice_list.html'
     context_object_name = 'items'
@@ -500,8 +505,8 @@ class InvoiceListView(LoginRequiredMixin, GroupRequiredMixin, ListView):
         context['search_value'] = self.request.GET.get('search_value', '').strip()
         return context
 
-class InvoiceCreateView(LoginRequiredMixin, GroupRequiredMixin, View):
-    group_required = ['Vendedor', 'Administrador']
+class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'billing.add_invoice'
     def get(self, request, *args, **kwargs):
         customers = Customer.objects.filter(is_active=True).select_related('profile')
         products = Product.objects.filter(is_active=True).select_related('brand', 'group')
@@ -690,6 +695,33 @@ class InvoiceCreateView(LoginRequiredMixin, GroupRequiredMixin, View):
                     item['product'].stock -= item['quantity']
                     item['product'].save()
                     
+            # Enviar correo al cliente si tiene email registrado
+            if customer.email:
+                try:
+                    from django.core.mail import EmailMessage
+                    pdf_data = generate_invoice_pdf_data(invoice)
+                    email = EmailMessage(
+                        subject=f'Factura #{invoice.id} - Sistema de Ventas',
+                        body=(
+                            f'Hola {customer.full_name},\n\n'
+                            f'Se ha generado la factura #{invoice.id} de su compra realizada el {invoice.invoice_date.strftime("%d/%m/%Y")}.\n'
+                            f'Adjunto a este correo encontrará el documento PDF con el detalle correspondiente.\n\n'
+                            f'Detalles de facturación:\n'
+                            f'- Subtotal: ${invoice.subtotal}\n'
+                            f'- IVA (15%): ${invoice.tax}\n'
+                            f'- Total Facturado: ${invoice.total}\n\n'
+                            f'Agradecemos su preferencia.\n'
+                            f'Atentamente,\nEl equipo de Ventas'
+                        ),
+                        from_email=None,
+                        to=[customer.email]
+                    )
+                    email.attach(f'Factura_{invoice.id}.pdf', pdf_data, 'application/pdf')
+                    email.send(fail_silently=False)
+                    messages.success(request, f"Factura enviada automáticamente al correo: {customer.email}")
+                except Exception as mail_err:
+                    messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {str(mail_err)}")
+
             messages.success(request, f"Factura #{invoice.id} guardada con éxito.")
             return redirect('billing:invoice_list')
             
@@ -771,8 +803,8 @@ class InvoiceCreateView(LoginRequiredMixin, GroupRequiredMixin, View):
             'selected_items_json': json.dumps(selected_items),
         }
         return render(request, 'billing/invoice_form.html', context)
-class InvoiceDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMixin, DeleteView):
-    group_required = ['Vendedor', 'Administrador']
+class InvoiceDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequiredMixin, DeleteView):
+    permission_required = 'billing.delete_invoice'
     model = Invoice
     template_name = 'billing/invoice_confirm_delete.html'
     success_url = reverse_lazy('billing:invoice_list')
@@ -780,7 +812,7 @@ class InvoiceDeleteView(LoginRequiredMixin, GroupRequiredMixin, StaffRequiredMix
 
 # === REPORTES DE PRODUCTOS (Excel / PDF) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_product')
 def product_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -877,7 +909,7 @@ def product_report_excel(request):
     return response
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_product')
 def product_report_pdf(request):
     import io
     import datetime
@@ -1023,7 +1055,7 @@ def product_report_pdf(request):
 
 # === REPORTES DE MARCAS (Excel / PDF) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_brand')
 def brand_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1097,7 +1129,7 @@ def brand_report_excel(request):
 
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_brand')
 def brand_report_pdf(request):
     import io
     import datetime
@@ -1207,7 +1239,7 @@ def brand_report_pdf(request):
 
 # === REPORTES DE CATEGORIAS / GRUPOS (Excel / PDF) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_productgroup')
 def productgroup_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1280,7 +1312,7 @@ def productgroup_report_excel(request):
 
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_productgroup')
 def productgroup_report_pdf(request):
     import io
     import datetime
@@ -1388,7 +1420,7 @@ def productgroup_report_pdf(request):
 
 # === REPORTES DE PROVEEDORES (Excel / PDF) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_supplier')
 def supplier_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1465,7 +1497,7 @@ def supplier_report_excel(request):
 
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('billing.view_supplier')
 def supplier_report_pdf(request):
     import io
     import datetime
@@ -1579,7 +1611,7 @@ def supplier_report_pdf(request):
 
 # === REPORTES DE CLIENTES (Excel / PDF) ===
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_customer')
 def customer_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1657,7 +1689,7 @@ def customer_report_excel(request):
 
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_customer')
 def customer_report_pdf(request):
     import io
     import datetime
@@ -1771,7 +1803,7 @@ def customer_report_pdf(request):
 
 # === REPORTES DE FACTURAS (Excel / PDF) ===
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_invoice')
 def invoice_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1859,7 +1891,7 @@ def invoice_report_excel(request):
 
 
 @login_required
-@group_required('Vendedor', 'Administrador')
+@permission_required('billing.view_invoice')
 def invoice_report_pdf(request):
     import io
     import datetime
@@ -1979,3 +2011,158 @@ def invoice_report_pdf(request):
 
     buffer.seek(0)
     return FileResponse(buffer, as_attachment=True, filename="Reporte_Facturas.pdf")
+
+
+def generate_invoice_pdf_data(invoice):
+    import io
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    # Estilos Personalizados
+    title_style = ParagraphStyle(
+        'InvoiceTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=5
+    )
+    normal_style = ParagraphStyle(
+        'InvoiceNormal',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#262626"),
+        spaceAfter=3
+    )
+    bold_style = ParagraphStyle(
+        'InvoiceBold',
+        parent=normal_style,
+        fontName='Helvetica-Bold'
+    )
+    
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.white,
+        alignment=1
+    )
+    
+    cell_left = ParagraphStyle(
+        'CellLeft',
+        parent=normal_style,
+        fontSize=9
+    )
+    cell_center = ParagraphStyle(
+        'CellCenter',
+        parent=normal_style,
+        fontSize=9,
+        alignment=1
+    )
+    cell_right = ParagraphStyle(
+        'CellRight',
+        parent=normal_style,
+        fontSize=9,
+        alignment=2
+    )
+
+    # Encabezado
+    story.append(Paragraph("FACTURA DE VENTA", title_style))
+    story.append(Paragraph(f"Factura Nº: {invoice.id}", bold_style))
+    story.append(Paragraph(f"Fecha: {invoice.invoice_date.strftime('%d/%m/%Y %H:%M')}", normal_style))
+    story.append(Spacer(1, 15))
+    
+    # Tabla de Datos Emisor / Receptor
+    info_data = [
+        [
+            Paragraph("<b>EMISOR</b><br/><b>Empresa:</b> Sistema de Ventas<br/><b>Email:</b> ventas@sistema.com", normal_style),
+            Paragraph(f"<b>CLIENTE</b><br/><b>Nombre:</b> {invoice.customer.full_name}<br/><b>DNI/RUC:</b> {invoice.customer.dni}<br/><b>Email:</b> {invoice.customer.email or '-'}<br/><b>Tlf:</b> {invoice.customer.phone or '-'}", normal_style)
+        ]
+    ]
+    info_table = Table(info_data, colWidths=[250, 250])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('PADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    
+    # Tabla de Productos
+    table_data = [
+        [
+            Paragraph("Producto", header_style),
+            Paragraph("Cant.", header_style),
+            Paragraph("Precio Unitario", header_style),
+            Paragraph("Subtotal", header_style)
+        ]
+    ]
+    
+    for detail in invoice.details.all():
+        table_data.append([
+            Paragraph(detail.product.name, cell_left),
+            Paragraph(str(detail.quantity), cell_center),
+            Paragraph(f"${detail.unit_price:,.2f}", cell_right),
+            Paragraph(f"${detail.subtotal:,.2f}", cell_right)
+        ])
+        
+    items_table = Table(table_data, colWidths=[260, 60, 90, 90])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#1F4E78")),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 15))
+    
+    # Tabla de Totales
+    totals_data = [
+        [Paragraph("", cell_left), Paragraph("Subtotal:", cell_right), Paragraph(f"${invoice.subtotal:,.2f}", cell_right)],
+        [Paragraph("", cell_left), Paragraph("IVA (15%):", cell_right), Paragraph(f"${invoice.tax:,.2f}", cell_right)],
+        [Paragraph("", cell_left), Paragraph("TOTAL:", ParagraphStyle('TBold', parent=cell_right, fontName='Helvetica-Bold')), Paragraph(f"${invoice.total:,.2f}", ParagraphStyle('TBold2', parent=cell_right, fontName='Helvetica-Bold'))]
+    ]
+    totals_table = Table(totals_data, colWidths=[320, 90, 90])
+    totals_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LINEABOVE', (1,2), (2,2), 1, colors.HexColor("#1F4E78")),
+    ]))
+    story.append(totals_table)
+    
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+@login_required
+@permission_required('billing.view_invoice')
+def invoice_pdf(request, pk):
+    from django.http import HttpResponse
+    invoice = get_object_or_404(Invoice, pk=pk)
+    pdf_data = generate_invoice_pdf_data(invoice)
+    response = HttpResponse(pdf_data, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Factura_{invoice.id}.pdf"'
+    return response
+
+

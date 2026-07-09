@@ -70,3 +70,22 @@ class GroupRequiredMixin:
         # 4. No tiene el rol -> mensaje de error y redirección
         messages.error(request, self.group_error_message)
         return redirect(self.group_redirect_url)
+
+
+from django.contrib.auth.mixins import PermissionRequiredMixin as DjangoPermissionRequiredMixin
+
+class PermissionRequiredMixin(DjangoPermissionRequiredMixin):
+    """
+    Mixin que verifica si el usuario tiene los permisos requeridos.
+    Si no los tiene, redirige al Home con un mensaje de error.
+    El superusuario siempre pasa.
+    """
+    permission_redirect_url = '/'
+    permission_error_message = 'No tienes permiso para acceder a esta opción.'
+
+    def handle_no_permission(self):
+        if not self.request.user.is_authenticated:
+            return redirect('login')
+        messages.error(self.request, self.permission_error_message)
+        return redirect(self.permission_redirect_url)
+

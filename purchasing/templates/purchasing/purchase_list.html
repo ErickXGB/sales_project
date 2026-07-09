@@ -56,7 +56,8 @@
           <td class="text-end">${{ pur.tax }}</td>
           <td class="text-end fw-bold">${{ pur.total }}</td>
           <td class="text-center">
-            <a href="{% url 'purchasing:purchase_detail' pur.pk %}" class="btn btn-sm btn-info">Ver</a>
+            <a href="{% url 'purchasing:purchase_detail' pur.pk %}" class="btn btn-sm btn-info text-white">Ver</a>
+            <a href="{% url 'purchasing:purchase_pdf' pur.pk %}" class="btn btn-sm btn-primary" title="Imprimir PDF"><i class="bi bi-printer"></i></a>
             <a href="{% url 'purchasing:purchase_delete' pur.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
           </td>
         </tr>

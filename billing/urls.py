@@ -46,5 +46,6 @@ urlpatterns = [
     path('invoices/report/pdf/', views.invoice_report_pdf, name='invoice_report_pdf'),
     path('invoices/report/excel/', views.invoice_report_excel, name='invoice_report_excel'),
     path('invoices/<int:pk>/', views.invoice_detail, name='invoice_detail'),
+    path('invoices/<int:pk>/pdf/', views.invoice_pdf, name='invoice_pdf'),
     path('invoices/<int:pk>/delete/', views.InvoiceDeleteView.as_view(), name='invoice_delete'),
 ]

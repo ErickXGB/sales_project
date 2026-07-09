@@ -23,7 +23,7 @@
         {% if user.is_authenticated %}
 
           <!-- COMPRAS: Analista de Compras y Administrador -->
-          {% if user|has_group:'Analista de Compras' or user|has_group:'Administrador' %}
+          {% if user|has_group:'Compras' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:brand_list' %}">Marcas</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:productgroup_list' %}">Grupos</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:supplier_list' %}">Proveedores</a></li>
@@ -32,7 +32,7 @@
           {% endif %}
 
           <!-- VENTAS: Vendedor y Administrador -->
-          {% if user|has_group:'Vendedor' or user|has_group:'Administrador' %}
+          {% if user|has_group:'Ventas' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:customer_list' %}">Clientes</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:invoice_list' %}">Facturas</a></li>
           {% endif %}
@@ -68,7 +68,6 @@
 
           {% else %}
           <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:signup' %}">Registrarse</a></li>
           {% endif %}
         </ul>
       </div>

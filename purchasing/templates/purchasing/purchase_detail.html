@@ -57,6 +57,7 @@
 
         <div class="mt-4">
             <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-secondary">Volver al listado</a>
+            <a href="{% url 'purchasing:purchase_pdf' purchase.pk %}" class="btn btn-primary"><i class="bi bi-printer me-1"></i>Imprimir / PDF</a>
             <a href="{% url 'purchasing:purchase_delete' purchase.pk %}" class="btn btn-danger">Eliminar</a>
         </div>
     </div>

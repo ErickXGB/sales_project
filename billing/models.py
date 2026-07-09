@@ -118,3 +118,4 @@ class InvoiceDetail(models.Model):
     def save(self, *args, **kwargs):
         self.subtotal = self.quantity * self.unit_price
         super().save(*args, **kwargs)
+

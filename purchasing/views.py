@@ -1,4 +1,4 @@
-from shared.decorators import group_required
+from shared.decorators import permission_required
 import json
 import re
 from django.shortcuts import render, redirect, get_object_or_404
@@ -11,7 +11,7 @@ from billing.models import Supplier, Product
 from .models import Purchase, PurchaseDetail
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.view_purchase')
 def purchase_list(request):
     """Lista todas las compras con búsqueda por campo (igual que product_list)."""
     purchases = Purchase.objects.select_related('supplier').all()
@@ -48,7 +48,7 @@ def purchase_list(request):
     return render(request, 'purchasing/purchase_list.html', context)
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.add_purchase')
 def purchase_create(request):
     """Crea una compra con sus detalles usando entrada dinámica (JS)."""
     if request.method == 'POST':
@@ -263,7 +263,7 @@ def _render_form_with_errors(request, supplier_select, supplier_name, supplier_c
     })
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.view_purchase')
 def purchase_detail(request, pk):
     """Detalle de una compra con prefetch_related('details__product')."""
     purchase = get_object_or_404(
@@ -273,7 +273,7 @@ def purchase_detail(request, pk):
     return render(request, 'purchasing/purchase_detail.html', {'purchase': purchase})
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.delete_purchase')
 def purchase_delete(request, pk):
     """Elimina una compra y todos sus detalles (CASCADE)."""
     purchase = get_object_or_404(Purchase, pk=pk)
@@ -285,7 +285,7 @@ def purchase_delete(request, pk):
     return render(request, 'purchasing/purchase_confirm_delete.html', {'object': purchase})
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.view_purchase')
 def purchase_report(request):
     """Reporte de costo promedio por producto."""
     products = Product.objects.annotate(
@@ -345,7 +345,7 @@ def get_numbered_canvas_class(title):
 
 # === REPORTES DE COMPRAS (Excel / PDF) ===
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.view_purchase')
 def purchase_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -441,7 +441,7 @@ def purchase_report_excel(request):
 
 
 @login_required
-@group_required('Analista de Compras', 'Administrador')
+@permission_required('purchasing.view_purchase')
 def purchase_report_pdf(request):
     import io
     import datetime
@@ -561,5 +561,154 @@ def purchase_report_pdf(request):
     
     buffer.seek(0)
     return FileResponse(buffer, as_attachment=True, filename="Reporte_Compras.pdf")
+
+
+def generate_purchase_pdf_data(purchase):
+    import io
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'PurchaseTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        textColor=colors.HexColor("#2F5597"),
+        spaceAfter=5
+    )
+    normal_style = ParagraphStyle(
+        'PurchaseNormal',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        textColor=colors.HexColor("#262626"),
+        spaceAfter=3
+    )
+    bold_style = ParagraphStyle(
+        'PurchaseBold',
+        parent=normal_style,
+        fontName='Helvetica-Bold'
+    )
+    
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.white,
+        alignment=1
+    )
+    
+    cell_left = ParagraphStyle(
+        'CellLeft',
+        parent=normal_style,
+        fontSize=9
+    )
+    cell_center = ParagraphStyle(
+        'CellCenter',
+        parent=normal_style,
+        fontSize=9,
+        alignment=1
+    )
+    cell_right = ParagraphStyle(
+        'CellRight',
+        parent=normal_style,
+        fontSize=9,
+        alignment=2
+    )
+
+    story.append(Paragraph("DETALLE DE COMPRA / ADQUISICIÓN", title_style))
+    story.append(Paragraph(f"Compra Nº: {purchase.id}", bold_style))
+    story.append(Paragraph(f"Nº Factura Proveedor: {purchase.document_number}", bold_style))
+    story.append(Paragraph(f"Fecha: {purchase.purchase_date.strftime('%d/%m/%Y %H:%M')}", normal_style))
+    story.append(Spacer(1, 15))
+    
+    info_data = [
+        [
+            Paragraph("<b>COMPRADOR (EMPRESA)</b><br/>Sistema de Ventas<br/>adquisiciones@sistema.com", normal_style),
+            Paragraph(f"<b>PROVEEDOR</b><br/><b>Nombre:</b> {purchase.supplier.name}<br/><b>Contacto:</b> {purchase.supplier.contact_name or '-'}<br/><b>Email:</b> {purchase.supplier.email or '-'}<br/><b>Tlf:</b> {purchase.supplier.phone or '-'}", normal_style)
+        ]
+    ]
+    info_table = Table(info_data, colWidths=[250, 250])
+    info_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('PADDING', (0,0), (-1,-1), 0),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    
+    table_data = [
+        [
+            Paragraph("Producto", header_style),
+            Paragraph("Cantidad", header_style),
+            Paragraph("Costo Unitario", header_style),
+            Paragraph("Subtotal", header_style)
+        ]
+    ]
+    
+    for detail in purchase.details.all():
+        table_data.append([
+            Paragraph(detail.product.name, cell_left),
+            Paragraph(str(detail.quantity), cell_center),
+            Paragraph(f"${detail.unit_cost:,.2f}", cell_right),
+            Paragraph(f"${detail.subtotal:,.2f}", cell_right)
+        ])
+        
+    items_table = Table(table_data, colWidths=[260, 60, 90, 90])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2F5597")),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#D9D9D9")),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 15))
+    
+    totals_data = [
+        [Paragraph("", cell_left), Paragraph("Subtotal:", cell_right), Paragraph(f"${purchase.subtotal:,.2f}", cell_right)],
+        [Paragraph("", cell_left), Paragraph("IVA (15%):", cell_right), Paragraph(f"${purchase.tax:,.2f}", cell_right)],
+        [Paragraph("", cell_left), Paragraph("TOTAL:", ParagraphStyle('TBold', parent=cell_right, fontName='Helvetica-Bold')), Paragraph(f"${purchase.total:,.2f}", ParagraphStyle('TBold2', parent=cell_right, fontName='Helvetica-Bold'))]
+    ]
+    totals_table = Table(totals_data, colWidths=[320, 90, 90])
+    totals_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('LINEABOVE', (1,2), (2,2), 1, colors.HexColor("#2F5597")),
+    ]))
+    story.append(totals_table)
+    
+    doc.build(story)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+@login_required
+@permission_required('purchasing.view_purchase')
+def purchase_pdf(request, pk):
+    from django.http import HttpResponse
+    purchase = get_object_or_404(Purchase, pk=pk)
+    pdf_data = generate_purchase_pdf_data(purchase)
+    response = HttpResponse(pdf_data, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="Compra_{purchase.id}.pdf"'
+    return response
 
 
