@@ -1,3 +1,5 @@
+# utiliar pip install -r requirements.txt para instalar las dependencias
+
 asgiref==3.11.1
 asttokens==3.0.1
 blinker==1.9.0
