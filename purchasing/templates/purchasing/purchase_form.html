@@ -60,14 +60,21 @@
         </div>
       </div>
 
-      <!-- Número de documento y fecha -->
+      <!-- Número de documento, fecha y tipo de pago -->
       <div class="row g-3 mt-2">
-        <div class="col-md-6">
+        <div class="col-md-4">
           <label for="document_number" class="form-label fw-bold">Número de Documento / Factura</label>
           <input type="text" name="document_number" id="document_number" class="form-control"
             placeholder="Ej. 001-001-000012345" required>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
+          <label for="tipo_pago" class="form-label fw-bold">Tipo de Pago</label>
+          <select name="tipo_pago" id="tipo_pago" class="form-select" required>
+            <option value="CREDITO" selected>Crédito</option>
+            <option value="CONTADO">Contado</option>
+          </select>
+        </div>
+        <div class="col-md-4">
           <label class="form-label fw-bold text-secondary">Fecha y Hora de Registro</label>
           <div class="d-flex align-items-center gap-2">
             <input type="text" id="current-datetime-display" class="form-control bg-light text-muted fst-italic"
@@ -325,6 +332,7 @@
       document.querySelector('#supplier_phone').value = postedValues.supplier_phone || '';
       document.querySelector('#supplier_address').value = postedValues.supplier_address || '';
       document.querySelector('#document_number').value = postedValues.document_number || '';
+      document.querySelector('#tipo_pago').value = postedValues.tipo_pago || 'CREDITO';
 
       setSupplierFieldsRequired(postedValues.supplier_select !== '');
     } else {

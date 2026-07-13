@@ -1,0 +1,124 @@
+{% extends 'billing/base.html' %}
+{% block title %}Panel de Seguridad{% endblock %}
+{% block content %}
+
+
+
+<h3>Panel de Seguridad y Accesos</h3>
+<!-- Opciones principales / Tarjetas de navegación -->
+<div class="row g-4 mb-5">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-primary border-4">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-primary mb-3"><i class="bi bi-people-fill"></i></div>
+                <h3 class="card-title fw-bold">Usuarios</h3>
+                <p class="text-muted">Gestiona las cuentas de usuario, asigna roles y crea nuevos perfiles de acceso.</p>
+                <div class="fs-4 fw-bold text-dark mb-3">{{ total_users }} Usuarios registrados</div>
+                <a href="{% url 'security:user_list' %}" class="btn btn-primary w-100">Administrar Usuarios</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-success border-4">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-success mb-3"><i class="bi bi-diagram-3-fill"></i></div>
+                <h3 class="card-title fw-bold">Roles y Permisos</h3>
+                <p class="text-muted">Administra los grupos de trabajo mediante la matriz interactiva de control de acceso.</p>
+                <div class="fs-4 fw-bold text-dark mb-3">{{ total_groups }} Roles / Grupos</div>
+                <a href="{% url 'security:group_list' %}" class="btn btn-success w-100">Ver Matriz de Roles</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-info border-4">
+            <div class="card-body text-center p-4">
+                <div class="display-4 text-info mb-3"><i class="bi bi-key-fill"></i></div>
+                <h3 class="card-title fw-bold">Permisos de Sistema</h3>
+                <p class="text-muted">Visualiza el desglose completo de todos los permisos registrados en Django.</p>
+                <div class="fs-4 fw-bold text-dark mb-3">{{ total_permissions }} Permisos totales</div>
+                <a href="{% url 'security:permission_list' %}" class="btn btn-info text-white w-100">Ver Todos los Permisos</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Últimos Usuarios Creados -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Usuarios Creados Recientemente</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Fecha Registro</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in recent_users %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ u.username }}</div>
+                                    <small class="text-muted">{{ u.first_name }} {{ u.last_name }}</small>
+                                </td>
+                                <td>{{ u.email }}</td>
+                                <td>{{ u.date_joined|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No hay registros recientes.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos Logins Activos -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold"><i class="bi bi-clock-history me-2 text-warning"></i>Últimos Inicios de Sesión</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Fecha y Hora</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in recent_logins %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">{{ u.username }}</div>
+                                </td>
+                                <td>{{ u.last_login|date:"d/m/Y H:i:s" }}</td>
+                                <td><span class="badge bg-success-subtle text-success">Activo</span></td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">No hay registros de login recientes.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

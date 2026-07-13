@@ -1,0 +1,65 @@
+{% extends 'billing/base.html' %}
+{% block title %}Compras Pendientes{% endblock %}
+{% block content %}
+<h2>Compras Pendientes de Pago (Crédito)</h2>
+
+<!-- Buscador por campos -->
+<form method="get" class="mb-4">
+  <div class="input-group shadow-sm" style="max-width: 700px;">
+    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+      <option value="all" {% if search_field == 'all' %}selected{% endif %}>Todos los campos</option>
+      <option value="id" {% if search_field == 'id' %}selected{% endif %}>ID Compra</option>
+      <option value="numero" {% if search_field == 'numero' %}selected{% endif %}>Nº Factura Proveedor</option>
+      <option value="supplier_name" {% if search_field == 'supplier_name' %}selected{% endif %}>Proveedor (Nombre)</option>
+    </select>
+    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
+      placeholder="Ingrese el término a buscar..." value="{{ search_value }}">
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="{% url 'pagos:compras_pendientes' %}" class="btn btn-outline-secondary">Limpiar</a>
+  </div>
+</form>
+
+<div class="mb-3 d-flex gap-2">
+  <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Panel</a>
+</div>
+
+<table class="table table-striped table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>ID</th>
+      <th>Factura Proveedor</th>
+      <th>Proveedor</th>
+      <th>Fecha Compra</th>
+      <th class="text-end">Total</th>
+      <th class="text-end text-danger">Saldo Pendiente</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for comp in items %}
+    <tr>
+      <td>{{ comp.id }}</td>
+      <td><span class="fw-bold">{{ comp.document_number }}</span></td>
+      <td>{{ comp.supplier }}</td>
+      <td>{{ comp.purchase_date|date:"d/m/Y H:i" }}</td>
+      <td class="text-end">${{ comp.total }}</td>
+      <td class="text-end fw-bold text-danger">${{ comp.saldo }}</td>
+      <td>
+        <a href="{% url 'purchasing:purchase_detail' comp.pk %}" class="btn btn-sm btn-info text-white" title="Ver Detalle">Ver</a>
+        <a href="{% url 'pagos:registrar_pago_compra' comp.pk %}" class="btn btn-sm btn-success" title="Registrar Pago"><i class="bi bi-cash-coin me-1"></i>Pagar</a>
+        {% if comp.whatsapp_phone %}
+        <a href="https://wa.me/{{ comp.whatsapp_phone }}?text={{ comp.whatsapp_message|urlencode }}" target="_blank" class="btn btn-sm btn-success" title="Notificar por WhatsApp"><i class="bi bi-whatsapp"></i></a>
+        {% else %}
+        <button class="btn btn-sm btn-secondary" disabled title="Sin teléfono para WhatsApp"><i class="bi bi-whatsapp"></i></button>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" class="text-center">No hay compras a crédito pendientes de pago.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

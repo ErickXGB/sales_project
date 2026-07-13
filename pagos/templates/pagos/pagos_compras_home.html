@@ -1,0 +1,152 @@
+{% extends 'billing/base.html' %}
+{% block title %}Panel de Cuentas por Pagar{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold text-dark"><i class="bi bi-journal-check me-2 text-primary"></i>Panel de Cuentas por Pagar (Compras)</h3>
+    <div class="d-flex gap-2">
+        <a href="{% url 'pagos:compras_pendientes' %}" class="btn btn-outline-primary"><i class="bi bi-hourglass-split me-1"></i>Compras Pendientes</a>
+        <a href="{% url 'pagos:compras_pagadas' %}" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Compras Pagadas</a>
+        <a href="{% url 'pagos:historial_pagos_compras' %}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i>Historial de Pagos</a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-4 mb-5">
+    <!-- Total Pendiente -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-warning border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Saldo Pendiente por Pagar</span>
+                    <span class="fs-3 text-warning"><i class="bi bi-exclamation-circle-fill"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-1">${{ total_pendientes_monto|floatformat:2 }}</h2>
+                <p class="text-muted mb-0 small">{{ total_pendientes_count }} compras pendientes de pago</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total Pagado -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-success border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Total Pagado a Proveedores</span>
+                    <span class="fs-3 text-success"><i class="bi bi-cash-coin"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-1">${{ total_pagos_monto|floatformat:2 }}</h2>
+                <p class="text-muted mb-0 small">{{ total_pagos_count }} pagos/abonos registrados</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tasa de Pago -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-primary border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Porcentaje Pagado</span>
+                    <span class="fs-3 text-primary"><i class="bi bi-graph-up-arrow"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-2">{{ porcentaje_pagado }}%</h2>
+                <div class="progress mb-0" style="height: 8px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ porcentaje_pagado }}%" aria-valuenow="{{ porcentaje_pagado }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Compras con Mayor Saldo Pendiente (Críticas) -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="bi bi-shield-fill-exclamation me-2 text-danger"></i>Compras Prioritarias por Pagar
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Compra / Factura</th>
+                                <th>Proveedor</th>
+                                <th class="text-end">Saldo Pendiente</th>
+                                <th class="text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for comp in top_pending_purchases %}
+                            <tr>
+                                <td>
+                                    <span class="fw-bold text-primary">{{ comp.document_number }}</span>
+                                    <br><small class="text-muted">{{ comp.purchase_date|date:"d/m/Y" }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ comp.supplier.name }}</div>
+                                    <small class="text-muted">Tlf: {{ comp.supplier.phone|default:"-" }}</small>
+                                </td>
+                                <td class="text-end fw-bold text-danger">${{ comp.saldo }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'pagos:registrar_pago_compra' comp.id %}" class="btn btn-sm btn-success" title="Registrar Pago">
+                                        <i class="bi bi-plus-circle me-1"></i>Pagar
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">No hay compras a crédito pendientes de pago. ¡Excelente! 🎉</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos Pagos Registrados -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="bi bi-clock-history me-2 text-success"></i>Pagos Recientes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Compra / Proveedor</th>
+                                <th class="text-end">Monto Pagado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pago in recent_pagos %}
+                            <tr>
+                                <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ pago.compra.document_number }}</div>
+                                    <small class="text-muted">{{ pago.compra.supplier.name }}</small>
+                                </td>
+                                <td class="text-end fw-bold text-success">+${{ pago.valor }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">No se han registrado pagos recientemente.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

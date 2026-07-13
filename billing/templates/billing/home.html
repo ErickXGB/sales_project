@@ -1,118 +1,419 @@
 {% extends 'billing/base.html' %}
-{% block title %}Inicio - Sistema de Ventas{% endblock %}
+{% block title %}Inicio - Dashboard{% endblock %}
 {% block content %}
 
-<!-- Bienvenida -->
-<div class="p-4 mb-4 bg-light rounded-3">
-    <h1>¡Bienvenido, {{ user.first_name|default:user.username }}!</h1>
-    <p class="lead">Sistema de Gestión de Ventas y Facturación</p>
-</div>
-
-<!-- Tarjetas de resumen -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-white bg-primary">
-            <div class="card-body text-center">
-                <h2>{{ total_brands }}</h2>
-                <p>Marcas</p>
-                <a href="{% url 'billing:brand_list' %}" class="text-white">Ver todas</a>
-            </div>
+<!-- Header de Bienvenida -->
+<div class="card shadow-sm border-0 bg-dark text-white p-4 mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="fw-bold mb-1">¡Bienvenido, {{ user.first_name|default:user.username }}!</h2>
+            <p class="text-secondary-subtle mb-0">Sistema de Gestión de Ventas, Compras e Inventario</p>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-success">
-            <div class="card-body text-center">
-                <h2>{{ total_products }}</h2>
-                <p>Productos</p>
-                <a href="{% url 'billing:product_list' %}" class="text-white">Ver todos</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-info">
-            <div class="card-body text-center">
-                <h2>{{ total_customers }}</h2>
-                <p>Clientes</p>
-                <a href="{% url 'billing:customer_list' %}" class="text-white">Ver todos</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-warning">
-            <div class="card-body text-center">
-                <h2>{{ total_invoices }}</h2>
-                <p>Facturas</p>
-                <a href="{% url 'billing:invoice_list' %}" class="text-white">Ver todas</a>
-            </div>
+        <div class="text-end">
+            <span class="text-muted d-block small">Roles asignados</span>
+            {% for group in groups %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 ms-1">{{ group }}</span>
+            {% empty %}
+                {% if user.is_superuser %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 py-1">Superusuario</span>
+                {% else %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">Sin Rol Asignado</span>
+                {% endif %}
+            {% endfor %}
         </div>
     </div>
 </div>
 
-<div class="row">
-    <!-- Últimas facturas -->
-    <div class="col-md-7">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5>Facturas Recientes</h5>
+{% if not is_admin and not is_gerente and not is_ventas and not is_compras %}
+<!-- Sin Rol Asignado -->
+<div class="alert alert-warning border-0 p-4 text-center">
+    <div class="display-1 text-warning mb-3"><i class="bi bi-shield-slash-fill"></i></div>
+    <h4>Acceso Limitado</h4>
+    <p class="mb-0 text-muted">Tu cuenta actualmente no posee ningún rol asignado en el sistema. Por favor, solicita a un Administrador que te asigne uno de los grupos de acceso:</p>
+    <div class="mt-3">
+        <span class="badge bg-secondary p-2 px-3 mx-1">Administrador</span>
+        <span class="badge bg-secondary p-2 px-3 mx-1">Gerente</span>
+        <span class="badge bg-secondary p-2 px-3 mx-1">Ventas</span>
+        <span class="badge bg-secondary p-2 px-3 mx-1">Compras</span>
+    </div>
+</div>
+{% endif %}
+
+<!-- ========================================== -->
+<!-- 1. DASHBOARD DE GERENCIA -->
+<!-- ========================================== -->
+{% if is_gerente or is_admin %}
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Panel de Gerencia y Finanzas</h4>
+        <hr class="flex-grow-1 ms-3 my-0">
+    </div>
+
+    <!-- KPIs Gerente -->
+    <div class="row g-4 mb-4">
+        <!-- Ventas vs Compras -->
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold">Ventas Totales</span>
+                    <h3 class="fw-bold text-primary mt-1 mb-0">${{ total_ventas|floatformat:2 }}</h3>
+                    <small class="text-muted">Facturación activa registrada</small>
+                </div>
             </div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Cliente</th>
-                            <th>Fecha</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for inv in recent_invoices %}
-                        <tr>
-                            <td>{{ inv.id }}</td>
-                            <td>{{ inv.customer }}</td>
-                            <td>{{ inv.invoice_date|date:"d/m/Y" }}</td>
-                            <td>${{ inv.total }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center">Aún no hay facturas.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-dark border-4">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold">Compras Totales</span>
+                    <h3 class="fw-bold text-dark mt-1 mb-0">${{ total_compras|floatformat:2 }}</h3>
+                    <small class="text-muted">Abastecimiento registrado</small>
+                </div>
+            </div>
+        </div>
+        <!-- Saldos por Cobrar vs Pagar -->
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-warning border-4">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold">Cuentas por Cobrar</span>
+                    <h3 class="fw-bold text-warning mt-1 mb-0">${{ saldo_por_cobrar|floatformat:2 }}</h3>
+                    <small class="text-muted">Saldo pendiente de clientes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4">
+                <div class="card-body">
+                    <span class="text-muted small fw-semibold">Cuentas por Pagar</span>
+                    <h3 class="fw-bold text-danger mt-1 mb-0">${{ saldo_por_pagar|floatformat:2 }}</h3>
+                    <small class="text-muted">Saldo pendiente a proveedores</small>
+                </div>
             </div>
         </div>
     </div>
-    <!-- Productos con bajo stock -->
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-header bg-danger text-white">
-                <h5>Alerta de Bajo Stock</h5>
-            </div>
-            <div class="card-body">
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Producto</th>
-                            <th>Stock</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for p in low_stock %}
-                        <tr>
-                            <td>{{ p.name }}</td>
-                            <td><span class="badge bg-danger">{{ p.stock }}</span></td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="2" class="text-center text-success">Todos los productos tienen suficiente stock.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+    <!-- Atajos Rápidos Gerente -->
+    <div class="card shadow-sm border-0 mb-4 bg-light-subtle">
+        <div class="card-body py-3">
+            <span class="fw-bold text-secondary me-3"><i class="bi bi-link-45deg me-1"></i>Atajos de Gestión:</span>
+            <div class="d-inline-flex gap-2 flex-wrap">
+                <a href="{% url 'pagos:pagos_home' %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-wallet2 me-1"></i>Cobros de Clientes</a>
+                <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-journal-check me-1"></i>Pagos a Proveedores</a>
+                <a href="{% url 'billing:customer_list' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-people me-1"></i>Clientes</a>
+                <a href="{% url 'billing:supplier_list' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-truck me-1"></i>Proveedores</a>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- 2. DASHBOARD DE VENTAS -->
+<!-- ========================================== -->
+{% if is_ventas %}
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-cart-fill me-2 text-success"></i>Módulo de Ventas y Clientes</h4>
+        <hr class="flex-grow-1 ms-3 my-0">
+    </div>
+
+    <!-- KPIs Ventas -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0 border-start border-success border-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold">Clientes Activos</span>
+                        <h4 class="fw-bold text-success mb-0">{{ total_customers }}</h4>
+                    </div>
+                    <div class="fs-2 text-success-subtle"><i class="bi bi-people-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0 border-start border-primary border-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold">Facturas Generadas</span>
+                        <h4 class="fw-bold text-primary mb-0">{{ total_invoices_sales }}</h4>
+                    </div>
+                    <div class="fs-2 text-primary-subtle"><i class="bi bi-file-earmark-spreadsheet-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 col-lg-6">
+            <div class="card shadow-sm border-0 bg-success text-white">
+                <div class="card-body d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-plus-circle-fill me-2"></i>Facturación Rápida</h5>
+                        <p class="mb-0 small text-white-50">Genera una nueva venta y emite el comprobante de inmediato.</p>
+                    </div>
+                    <a href="{% url 'billing:invoice_create' %}" class="btn btn-light fw-bold text-success">Crear Factura</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tablas Ventas -->
+    <div class="row">
+        <!-- Facturas Recientes -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light border-0 py-3">
+                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-receipt me-2 text-primary"></i>Facturas Recientes</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Cliente</th>
+                                    <th>Total</th>
+                                    <th class="text-center">Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inv in recent_invoices %}
+                                <tr>
+                                    <td><span class="fw-bold">{{ inv.numero|default:inv.id }}</span></td>
+                                    <td>{{ inv.customer.full_name }}</td>
+                                    <td class="fw-semibold">${{ inv.total }}</td>
+                                    <td class="text-center">
+                                        <a href="{% url 'billing:invoice_detail' inv.id %}" class="btn btn-sm btn-outline-info py-0">Ver</a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No se registran facturas recientes.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuentas por Cobrar Pendientes -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light border-0 py-3">
+                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-hourglass-split me-2 text-warning"></i>Facturas con Saldo Pendiente</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nº</th>
+                                    <th>Cliente</th>
+                                    <th class="text-end text-danger">Saldo</th>
+                                    <th class="text-center">Cobrar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inv in pending_cobros %}
+                                <tr>
+                                    <td><span class="fw-bold text-primary">{{ inv.numero|default:inv.id }}</span></td>
+                                    <td>{{ inv.customer.full_name }}</td>
+                                    <td class="text-end fw-semibold text-danger">${{ inv.saldo }}</td>
+                                    <td class="text-center">
+                                        <a href="{% url 'pagos:registrar_pago' inv.id %}" class="btn btn-sm btn-success py-0">Cobrar</a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No hay cobros pendientes de cobro.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- 3. DASHBOARD DE COMPRAS -->
+<!-- ========================================== -->
+{% if is_compras %}
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-truck me-2 text-danger"></i>Módulo de Compras y Abastecimiento</h4>
+        <hr class="flex-grow-1 ms-3 my-0">
+    </div>
+
+    <!-- KPIs Compras -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0 border-start border-danger border-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold">Proveedores</span>
+                        <h4 class="fw-bold text-danger mb-0">{{ total_suppliers }}</h4>
+                    </div>
+                    <div class="fs-2 text-danger-subtle"><i class="bi bi-truck"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0 border-start border-warning border-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold">Bajo Stock</span>
+                        <h4 class="fw-bold text-warning mb-0">
+                            {% if low_stock %}{{ low_stock|length }}{% else %}0{% endif %} Productos
+                        </h4>
+                    </div>
+                    <div class="fs-2 text-warning-subtle"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 col-lg-6">
+            <div class="card shadow-sm border-0 bg-danger text-white">
+                <div class="card-body d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-plus-circle-fill me-2"></i>Registrar Compra</h5>
+                        <p class="mb-0 small text-white-50">Abastece el stock del inventario registrando facturas de proveedores.</p>
+                    </div>
+                    <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-light fw-bold text-danger">Nueva Compra</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tablas Compras -->
+    <div class="row">
+        <!-- Productos con bajo stock -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 border-start border-warning border-3 mb-4">
+                <div class="card-header bg-light border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="card-title mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle me-2"></i>Alertas de Reposición de Inventario</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Marca</th>
+                                    <th class="text-center">Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in low_stock %}
+                                <tr>
+                                    <td><span class="fw-semibold">{{ p.name }}</span></td>
+                                    <td>{{ p.brand.name }}</td>
+                                    <td class="text-center"><span class="badge bg-danger">{{ p.stock }}</span></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-success py-2">Todo el inventario está correctamente abastecido.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cuentas por Pagar (Compras a Crédito Pendientes) -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-light border-0 py-3">
+                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-wallet2 me-2 text-danger"></i>Compras Pendientes de Liquidar</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Factura Prov.</th>
+                                    <th>Proveedor</th>
+                                    <th class="text-end text-danger">Saldo</th>
+                                    <th class="text-center">Pagar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for comp in pending_pagos %}
+                                <tr>
+                                    <td><span class="fw-bold">{{ comp.document_number }}</span></td>
+                                    <td>{{ comp.supplier.name }}</td>
+                                    <td class="text-end fw-semibold text-danger">${{ comp.saldo }}</td>
+                                    <td class="text-center">
+                                        <a href="{% url 'pagos:registrar_pago_compra' comp.id %}" class="btn btn-sm btn-outline-success py-0">Abonar</a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-2">No hay pagos a crédito pendientes.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+<!-- ========================================== -->
+<!-- 4. PANEL DE ADMINISTRADOR -->
+<!-- ========================================== -->
+{% if is_admin %}
+<div class="mb-5">
+    <div class="d-flex align-items-center mb-3">
+        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Panel de Control del Administrador</h4>
+        <hr class="flex-grow-1 ms-3 my-0">
+    </div>
+
+    <!-- KPIs Admin -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 text-center py-3">
+                <div class="display-5 text-primary"><i class="bi bi-people"></i></div>
+                <h3 class="fw-bold text-dark mt-2 mb-0">{{ total_users }}</h3>
+                <span class="text-muted small">Usuarios Registrados</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 text-center py-3">
+                <div class="display-5 text-warning"><i class="bi bi-exclamation-circle"></i></div>
+                <h3 class="fw-bold text-dark mt-2 mb-0">{{ low_stock_count }}</h3>
+                <span class="text-muted small">Productos en Alerta de Stock</span>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 text-center py-3">
+                <div class="display-5 text-success"><i class="bi bi-file-earmark-text"></i></div>
+                <h3 class="fw-bold text-dark mt-2 mb-0">{{ total_invoices }} / {{ total_purchases }}</h3>
+                <span class="text-muted small">Facturas / Compras registradas</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Atajos Rápidos Admin -->
+    <div class="card shadow-sm border-0 mb-4 bg-light-subtle">
+        <div class="card-body py-3">
+            <span class="fw-bold text-secondary me-3"><i class="bi bi-shield-check me-1"></i>Acciones de Seguridad:</span>
+            <div class="d-inline-flex gap-2 flex-wrap">
+                <a href="{% url 'security:security_home' %}" class="btn btn-sm btn-primary"><i class="bi bi-speedometer2 me-1"></i>Panel de Control de Seguridad</a>
+                <a href="{% url 'security:user_list' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i>Gestionar Usuarios</a>
+                <a href="{% url 'security:group_list' %}" class="btn btn-sm btn-outline-success"><i class="bi bi-diagram-3 me-1"></i>Matriz de Roles y Permisos</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% endblock %}

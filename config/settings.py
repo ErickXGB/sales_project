@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'billing',  # Nuestra app de facturación
     'purchasing',  # Nuestra app de compras
     'security', # Nuestra app de seguridad
+    'pagos', # Nuestra app de pagos y cobros
     'django_extensions',
 ]
 
@@ -109,7 +110,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'es'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Guayaquil'
 
 USE_I18N = True
 
@@ -137,3 +138,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER')
+
+# PayPal Config
+PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID', default='sb')

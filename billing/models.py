@@ -104,8 +104,81 @@ class Invoice(models.Model):
     tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
+    
+    # Nuevos campos para cobros
+    numero = models.CharField(max_length=20, unique=True, blank=True, null=True, verbose_name='Número de Factura')
+    tipo_pago = models.CharField(
+        max_length=10,
+        choices=[('CONTADO', 'Contado'), ('CREDITO', 'Crédito')],
+        default='CREDITO',
+        verbose_name='Tipo de Pago'
+    )
+    saldo = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name='Saldo')
+    estado = models.CharField(
+        max_length=15,
+        choices=[('PENDIENTE', 'Pendiente'), ('PAGADA', 'Pagada'), ('ANULADA', 'Anulada')],
+        default='PENDIENTE',
+        verbose_name='Estado'
+    )
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=[('EFECTIVO', 'Efectivo'), ('TRANSFERENCIA', 'Transferencia'), ('PAYPAL', 'PayPal'), ('CREDITO', 'Crédito')],
+        default='EFECTIVO',
+        verbose_name='Método de Pago'
+    )
+
     class Meta: ordering = ['-invoice_date']
     def __str__(self): return f'Invoice #{self.id} - {self.customer}'
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new:
+            if self.tipo_pago == 'CREDITO' or self.metodo_pago == 'PAYPAL':
+                self.saldo = self.total
+                self.estado = 'PENDIENTE'
+            else:
+                self.saldo = 0.00
+                self.estado = 'PAGADA'
+        super().save(*args, **kwargs)
+        if not self.numero:
+            self.numero = f"FAC-{self.id:06d}"
+            super().save(update_fields=['numero'])
+
+    @property
+    def whatsapp_phone(self):
+        """Devuelve el número de teléfono del cliente formateado para WhatsApp (solo dígitos)."""
+        if not self.customer.phone:
+            return ""
+        # Limpiar el número conservando el signo '+' si está presente al inicio
+        cleaned = "".join(c for c in self.customer.phone if c.isdigit() or c == '+')
+        if cleaned.startswith('+'):
+            return cleaned[1:]
+        
+        # Respaldo de prefijo por defecto si no se ingresó con prefijo (ej. Ecuador: 593)
+        digits_only = "".join(c for c in cleaned if c.isdigit())
+        if len(digits_only) == 10 and digits_only.startswith('0'):
+            digits_only = '593' + digits_only[1:]
+        elif len(digits_only) == 9 and digits_only.startswith('9'):
+            digits_only = '593' + digits_only
+        return digits_only
+
+    @property
+    def whatsapp_message(self):
+        """Genera el mensaje pre-redactado para enviar al cliente por WhatsApp."""
+        msg = (
+            f"Estimado/a *{self.customer.full_name}*,\n\n"
+            f"Le informamos que se ha registrado una transacción sobre su *Factura #{self.numero or f'FAC-{self.id:06d}'}* emitida el {self.invoice_date.strftime('%d/%m/%Y')}.\n\n"
+            f"*Detalles del Documento:*\n"
+            f"- Subtotal: ${self.subtotal}\n"
+            f"- IVA (15%): ${self.tax}\n"
+            f"- Total: ${self.total}\n"
+            f"- Saldo Pendiente: ${self.saldo}\n"
+            f"- Estado de Pago: {self.get_estado_display()}\n\n"
+            f"Agradecemos su preferencia.\n"
+            f"Saludos cordiales."
+        )
+        return msg
+
 
 class InvoiceDetail(models.Model):
     """Líneas de factura."""
@@ -118,4 +191,7 @@ class InvoiceDetail(models.Model):
     def save(self, *args, **kwargs):
         self.subtotal = self.quantity * self.unit_price
         super().save(*args, **kwargs)
+
+
+
 

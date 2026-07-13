@@ -16,6 +16,54 @@ from shared.mixins import StaffRequiredMixin, PermissionRequiredMixin
 from django.utils.decorators import method_decorator
 from shared.decorators import audit_action, permission_required
 
+import threading
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+
+_local_data = threading.local()
+
+def set_current_report_title(title):
+    _local_data.current_title = title
+
+def get_current_report_title():
+    return getattr(_local_data, 'current_title', "Sistema de Ventas - Reporte")
+
+class NumberedCanvas(canvas.Canvas):
+    def __init__(self, *args, **kwargs):
+        canvas.Canvas.__init__(self, *args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        num_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self.draw_page_number(num_pages)
+            canvas.Canvas.showPage(self)
+        canvas.Canvas.save(self)
+
+    def draw_page_number(self, page_count):
+        self.saveState()
+        self.setFont("Helvetica", 9)
+        self.setFillColor(colors.HexColor("#7F7F7F"))
+        self.setStrokeColor(colors.HexColor("#D9D9D9"))
+        self.setLineWidth(0.5)
+        self.line(36, 756, 576, 756)
+        
+        # Obtener título dinámico
+        title = get_current_report_title()
+        self.drawString(36, 762, title)
+        
+        self.line(36, 54, 576, 54)
+        page_text = f"Página {self._pageNumber} de {page_count}"
+        self.drawRightString(576, 42, page_text)
+        self.drawString(36, 42, "Reporte generado automáticamente")
+        self.restoreState()
+
+
 # === REGISTRO ===
 class SignUpView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     form_class = SignUpForm
@@ -33,15 +81,84 @@ class SignUpView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
 
 @login_required
 def home(request):
-    """Vista principal del sistema. Muestra resumen general."""
+    """Vista principal del sistema. Muestra resumen personalizado según el rol."""
+    from django.db.models import Sum
+    from django.contrib.auth.models import User
+    from purchasing.models import Purchase
+    from pagos.models import CobroFactura, PagoCompra
+
+    user = request.user
+    
+    # Determinar los grupos del usuario
+    groups = list(user.groups.values_list('name', flat=True))
+    is_admin = user.is_superuser or 'Administrador' in groups
+    is_gerente = 'Gerente' in groups
+    is_ventas = 'Ventas' in groups
+    is_compras = 'Compras' in groups
+
     context = {
-        'total_brands': Brand.objects.count(),
-        'total_products': Product.objects.count(),
-        'total_customers': Customer.objects.count(),
-        'total_invoices': Invoice.objects.count(),
-        'recent_invoices': Invoice.objects.all()[:5],  # Últimas 5
-        'low_stock': Product.objects.filter(stock__lte=5, is_active=True),
+        'groups': groups,
+        'is_admin': is_admin,
+        'is_gerente': is_gerente,
+        'is_ventas': is_ventas,
+        'is_compras': is_compras,
     }
+
+    # Cargar datos compartidos o específicos según el rol
+    if is_admin:
+        context.update({
+            'total_users': User.objects.count(),
+            'recent_users': User.objects.order_by('-date_joined')[:5],
+            'recent_logins': User.objects.filter(last_login__isnull=False).order_by('-last_login')[:5],
+            'low_stock_count': Product.objects.filter(stock__lte=5, is_active=True).count(),
+            'total_invoices': Invoice.objects.filter(is_active=True).count(),
+            'total_purchases': Purchase.objects.filter(is_active=True).count(),
+        })
+
+    if is_gerente or is_admin:
+        # Ventas totales
+        invoices = Invoice.objects.filter(is_active=True)
+        total_ventas = invoices.aggregate(Sum('total'))['total__sum'] or Decimal('0.00')
+        # Compras totales
+        purchases = Purchase.objects.filter(is_active=True)
+        total_compras = purchases.aggregate(Sum('total'))['total__sum'] or Decimal('0.00')
+        
+        # Saldos pendientes
+        saldo_por_cobrar = invoices.filter(tipo_pago='CREDITO', estado='PENDIENTE').aggregate(Sum('saldo'))['saldo__sum'] or Decimal('0.00')
+        saldo_por_pagar = purchases.filter(tipo_pago='CREDITO', estado='PENDIENTE').aggregate(Sum('saldo'))['saldo__sum'] or Decimal('0.00')
+
+        # Cobros y Pagos realizados
+        total_cobrado = CobroFactura.objects.aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+        total_pagado = PagoCompra.objects.aggregate(Sum('valor'))['valor__sum'] or Decimal('0.00')
+
+        context.update({
+            'total_ventas': total_ventas,
+            'total_compras': total_compras,
+            'saldo_por_cobrar': saldo_por_cobrar,
+            'saldo_por_pagar': saldo_por_pagar,
+            'total_cobrado': total_cobrado,
+            'total_pagado': total_pagado,
+            'total_products': Product.objects.filter(is_active=True).count(),
+            'total_customers': Customer.objects.filter(is_active=True).count(),
+            'total_suppliers': Supplier.objects.filter(is_active=True).count(),
+        })
+
+    if is_ventas:
+        context.update({
+            'total_customers': Customer.objects.filter(is_active=True).count(),
+            'total_invoices_sales': Invoice.objects.filter(is_active=True).count(),
+            'recent_invoices': Invoice.objects.filter(is_active=True).select_related('customer').order_by('-invoice_date')[:5],
+            'pending_cobros': Invoice.objects.filter(tipo_pago='CREDITO', estado='PENDIENTE', is_active=True).select_related('customer').order_by('-invoice_date')[:5],
+        })
+
+    if is_compras:
+        context.update({
+            'low_stock': Product.objects.filter(stock__lte=5, is_active=True).select_related('brand'),
+            'total_suppliers': Supplier.objects.filter(is_active=True).count(),
+            'recent_purchases': Purchase.objects.filter(is_active=True).select_related('supplier').order_by('-purchase_date')[:5],
+            'pending_pagos': Purchase.objects.filter(tipo_pago='CREDITO', estado='PENDIENTE', is_active=True).select_related('supplier').order_by('-purchase_date')[:5],
+        })
+
     return render(request, 'billing/home.html', context)
 
 
@@ -508,6 +625,25 @@ class InvoiceListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = 'billing.add_invoice'
     def get(self, request, *args, **kwargs):
+        # Asegurar que Consumidor Final existe
+        cf_obj, created = Customer.objects.get_or_create(
+            dni="9999999999",
+            defaults={
+                'first_name': 'Consumidor',
+                'last_name': 'Final',
+                'is_active': True
+            }
+        )
+        if created or not hasattr(cf_obj, 'profile') or not cf_obj.profile:
+            CustomerProfile.objects.get_or_create(
+                customer=cf_obj,
+                defaults={
+                    'taxpayer_type': 'final',
+                    'payment_terms': 'cash',
+                    'credit_limit': Decimal('0.00')
+                }
+            )
+
         customers = Customer.objects.filter(is_active=True).select_related('profile')
         products = Product.objects.filter(is_active=True).select_related('brand', 'group')
         
@@ -528,7 +664,7 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 'phone': c.phone or '',
                 'address': c.address or '',
                 'taxpayer_type': taxpayer_type,
-                'payment_terms': payment_terms
+                'payment_terms': 'credit' if payment_terms.startswith('credit') else 'cash'
             })
             
         products_json = []
@@ -559,6 +695,29 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         customer_address = request.POST.get('customer_address', '').strip() or None
         customer_taxpayer_type = request.POST.get('customer_taxpayer_type', 'final')
         customer_payment_terms = request.POST.get('customer_payment_terms', 'cash')
+        
+        # Asegurar que Consumidor Final existe
+        cf_obj, created = Customer.objects.get_or_create(
+            dni="9999999999",
+            defaults={
+                'first_name': 'Consumidor',
+                'last_name': 'Final',
+                'is_active': True
+            }
+        )
+        if created or not hasattr(cf_obj, 'profile') or not cf_obj.profile:
+            CustomerProfile.objects.get_or_create(
+                customer=cf_obj,
+                defaults={
+                    'taxpayer_type': 'final',
+                    'payment_terms': 'cash',
+                    'credit_limit': Decimal('0.00')
+                }
+            )
+
+        # Si el cliente es Consumidor Final, forzar pago al contado
+        if customer_dni == '9999999999' or (customer_id and customer_id != 'new' and Customer.objects.filter(id=customer_id, dni='9999999999').exists()):
+            customer_payment_terms = 'cash'
         
         product_ids = request.POST.getlist('product[]')
         quantities = request.POST.getlist('quantity[]')
@@ -676,12 +835,32 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 tax = subtotal * Decimal('0.15')
                 total = subtotal + tax
                 
+                if customer_payment_terms == 'paypal':
+                    metodo_pago = 'PAYPAL'
+                    tipo_pago = 'CONTADO'
+                    saldo = total
+                    estado = 'PENDIENTE'
+                elif customer_payment_terms in ['credit', 'credit_15', 'credit_30', 'credit_60'] or customer_payment_terms.startswith('credit'):
+                    metodo_pago = 'CREDITO'
+                    tipo_pago = 'CREDITO'
+                    saldo = total
+                    estado = 'PENDIENTE'
+                else:
+                    metodo_pago = 'EFECTIVO'
+                    tipo_pago = 'CONTADO'
+                    saldo = Decimal('0.00')
+                    estado = 'PAGADA'
+
                 invoice = Invoice.objects.create(
                     customer=customer,
                     subtotal=subtotal,
                     tax=tax,
                     total=total,
-                    is_active=True
+                    is_active=True,
+                    tipo_pago=tipo_pago,
+                    metodo_pago=metodo_pago,
+                    saldo=saldo,
+                    estado=estado
                 )
                 
                 for item in items_to_save:
@@ -723,6 +902,8 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {str(mail_err)}")
 
             messages.success(request, f"Factura #{invoice.id} guardada con éxito.")
+            if invoice.metodo_pago == 'PAYPAL':
+                return redirect('billing:invoice_paypal_checkout', pk=invoice.pk)
             return redirect('billing:invoice_list')
             
         except Exception as e:
@@ -750,7 +931,7 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 'phone': c.phone or '',
                 'address': c.address or '',
                 'taxpayer_type': taxpayer_type,
-                'payment_terms': payment_terms
+                'payment_terms': 'credit' if payment_terms.startswith('credit') else 'cash'
             })
             
         products_json = []
@@ -918,39 +1099,9 @@ def product_report_pdf(request):
     from reportlab.lib.pagesizes import letter
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.pdfgen import canvas
     
-    class NumberedCanvas(canvas.Canvas):
-        def __init__(self, *args, **kwargs):
-            canvas.Canvas.__init__(self, *args, **kwargs)
-            self._saved_page_states = []
-
-        def showPage(self):
-            self._saved_page_states.append(dict(self.__dict__))
-            self._startPage()
-
-        def save(self):
-            num_pages = len(self._saved_page_states)
-            for state in self._saved_page_states:
-                self.__dict__.update(state)
-                self.draw_page_number(num_pages)
-                canvas.Canvas.showPage(self)
-            canvas.Canvas.save(self)
-
-        def draw_page_number(self, page_count):
-            self.saveState()
-            self.setFont("Helvetica", 9)
-            self.setFillColor(colors.HexColor("#7F7F7F"))
-            self.setStrokeColor(colors.HexColor("#D9D9D9"))
-            self.setLineWidth(0.5)
-            self.line(36, 756, 576, 756)
-            self.drawString(36, 762, "Sistema de Ventas - Reporte de Productos")
-            self.line(36, 54, 576, 54)
-            page_text = f"Página {self._pageNumber} de {page_count}"
-            self.drawRightString(576, 42, page_text)
-            self.drawString(36, 42, "Reporte generado automáticamente")
-            self.restoreState()
-
+    set_current_report_title("Sistema de Ventas - Reporte de Productos")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1139,6 +1290,8 @@ def brand_report_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    set_current_report_title("Sistema de Ventas - Reporte de Marcas")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1322,6 +1475,8 @@ def productgroup_report_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    set_current_report_title("Sistema de Ventas - Reporte de Categorías")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1507,6 +1662,8 @@ def supplier_report_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    set_current_report_title("Sistema de Ventas - Reporte de Proveedores")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1699,6 +1856,8 @@ def customer_report_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    set_current_report_title("Sistema de Ventas - Reporte de Clientes")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -1901,6 +2060,8 @@ def invoice_report_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
 
+    set_current_report_title("Sistema de Ventas - Reporte de Facturas")
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer,
@@ -2166,3 +2327,63 @@ def invoice_pdf(request, pk):
     return response
 
 
+@login_required
+@permission_required('billing.view_invoice')
+def invoice_paypal_checkout(request, pk):
+    from django.conf import settings
+    invoice = get_object_or_404(Invoice, pk=pk)
+    if invoice.estado == 'PAGADA':
+        messages.warning(request, f"La factura #{invoice.id} ya se encuentra pagada.")
+        return redirect('billing:invoice_detail', pk=invoice.pk)
+    
+    context = {
+        'invoice': invoice,
+        'invoice_total_paypal': format(invoice.total, '.2f'),
+        'paypal_client_id': settings.PAYPAL_CLIENT_ID,
+        'title': f"Pago PayPal - Factura #{invoice.id}"
+    }
+    return render(request, 'billing/invoice_paypal_checkout.html', context)
+
+
+@login_required
+@permission_required('billing.change_invoice')
+def invoice_paypal_capture(request, pk):
+    from django.http import JsonResponse
+    import json
+    from pagos.models import CobroFactura
+    from django.utils import timezone
+    
+    invoice = get_object_or_404(Invoice, pk=pk)
+    if invoice.estado == 'PAGADA':
+        return JsonResponse({'status': 'error', 'message': 'La factura ya se encuentra pagada.'}, status=400)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            order_id = data.get('orderID')
+            payer_id = data.get('payerID')
+            
+            if not order_id:
+                return JsonResponse({'status': 'error', 'message': 'ID de Orden de PayPal faltante.'}, status=400)
+            
+            with transaction.atomic():
+                invoice = Invoice.objects.select_for_update().get(pk=pk)
+                if invoice.estado == 'PAGADA':
+                    return JsonResponse({'status': 'error', 'message': 'La factura ya se encuentra pagada.'}, status=400)
+                
+                monto_pagado = invoice.saldo
+                
+                # Registrar en CobroFactura (la cual decrementa el saldo y actualiza el estado de la factura automáticamente)
+                CobroFactura.objects.create(
+                    factura=invoice,
+                    fecha=timezone.now(),
+                    valor=monto_pagado,
+                    observacion=f"Pago completo realizado a través de PayPal (Orden ID: {order_id}, Payer ID: {payer_id})"
+                )
+                
+            messages.success(request, f"Pago con PayPal de ${monto_pagado} capturado exitosamente para la Factura #{invoice.id}.")
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            
+    return JsonResponse({'status': 'error', 'message': 'Método no permitido.'}, status=405)

@@ -5,7 +5,7 @@ from django.contrib.auth.views import LoginView, LogoutView
 from django.core.mail import send_mail
 from django.contrib import messages
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
 
 from shared.mixins import GroupRequiredMixin
 from .forms import UserRegisterForm, UserUpdateForm, GroupForm, PermissionForm
@@ -15,6 +15,21 @@ class AdminOnlyMixin(LoginRequiredMixin, GroupRequiredMixin):
     """Combina login + rol Administrador (el superusuario siempre pasa)."""
     group_required = ['Administrador']
     group_redirect_url = '/'
+
+
+# === PANEL DE INICIO DE SEGURIDAD ===
+class SecurityHomeView(AdminOnlyMixin, TemplateView):
+    template_name = 'security/security_home.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_users'] = User.objects.count()
+        context['total_groups'] = Group.objects.count()
+        context['total_permissions'] = Permission.objects.count()
+        context['recent_users'] = User.objects.order_by('-date_joined')[:5]
+        context['recent_logins'] = User.objects.filter(last_login__isnull=False).order_by('-last_login')[:5]
+        return context
+
 
 # === AUTENTICACIÓN (CBV) ===
 class RegisterView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
@@ -111,6 +126,58 @@ class GroupListView(AdminOnlyMixin, ListView):
     template_name = 'security/group_list.html'
     context_object_name = 'items'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # Lista de modelos y sus acciones para la matriz
+        models_config = [
+            {'label': 'Marca', 'codename_base': 'brand'},
+            {'label': 'Categoría', 'codename_base': 'productgroup'},
+            {'label': 'Proveedor', 'codename_base': 'supplier'},
+            {'label': 'Producto', 'codename_base': 'product'},
+            {'label': 'Cliente', 'codename_base': 'customer'},
+            {'label': 'Factura', 'codename_base': 'invoice'},
+            {'label': 'Compra', 'codename_base': 'purchase'},
+            {'label': 'Usuario', 'codename_base': 'user'},
+        ]
+        
+        actions = [
+            {'suffix': 'view', 'label': 'Leer'},
+            {'suffix': 'add', 'label': 'Crear'},
+            {'suffix': 'change', 'label': 'Editar'},
+            {'suffix': 'delete', 'label': 'Eliminar'},
+        ]
+        
+        # Generar lista plana de columnas para facilitar el rendering
+        columns = []
+        for mc in models_config:
+            for act in actions:
+                codename = f"{act['suffix']}_{mc['codename_base']}"
+                columns.append({
+                    'codename': codename,
+                    'label': f"{act['label']} {mc['label']}",
+                    'model_label': mc['label'],
+                    'action_label': act['label']
+                })
+                
+        context['models_config'] = models_config
+        context['actions'] = actions
+        context['matrix_columns'] = columns
+        
+        # Preparar datos de filas
+        groups_data = []
+        for g in Group.objects.all().prefetch_related('permissions'):
+            g_perms = set(p.codename for p in g.permissions.all())
+            groups_data.append({
+                'group': g,
+                'perms': g_perms,
+                'total_count': len(g_perms),
+            })
+            
+        context['groups_data'] = groups_data
+        context['total_permissions_count'] = len(columns)
+        return context
+
 class GroupCreateView(AdminOnlyMixin, CreateView):
     model = Group
     form_class = GroupForm
@@ -151,3 +218,61 @@ class PermissionDeleteView(AdminOnlyMixin, DeleteView):
     model = Permission
     template_name = 'security/confirm_delete.html'
     success_url = reverse_lazy('security:permission_list')
+
+
+# === ACCIONES AJAX Y EXPORTACIÓN DE LA MATRIZ ===
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import user_passes_test
+from django.core.management import call_command
+import json
+
+def is_admin_or_superuser(user):
+    return user.is_authenticated and (user.is_superuser or user.groups.filter(name='Administrador').exists())
+
+@user_passes_test(is_admin_or_superuser, login_url='/')
+@require_POST
+def update_group_permission(request):
+    try:
+        data = json.loads(request.body)
+        group_id = data.get('group_id')
+        codename = data.get('codename')
+        state = data.get('state')
+        
+        group = Group.objects.get(pk=group_id)
+        permission = Permission.objects.get(codename=codename)
+        
+        if state:
+            group.permissions.add(permission)
+        else:
+            group.permissions.remove(permission)
+            
+        return JsonResponse({'success': True, 'count': group.permissions.count()})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+@user_passes_test(is_admin_or_superuser, login_url='/')
+def export_permissions_json(request):
+    try:
+        data = {}
+        groups = Group.objects.all().prefetch_related('permissions')
+        for g in groups:
+            data[g.name] = [p.codename for p in g.permissions.all()]
+            
+        from django.http import HttpResponse
+        response = HttpResponse(json.dumps(data, indent=4), content_type='application/json')
+        response['Content-Disposition'] = 'attachment; filename="roles_permisos.json"'
+        return response
+    except Exception as e:
+        messages.error(request, f"Error al exportar JSON: {str(e)}")
+        return redirect('security:group_list')
+
+@user_passes_test(is_admin_or_superuser, login_url='/')
+@require_POST
+def reset_permissions(request):
+    try:
+        call_command('setup_roles')
+        return JsonResponse({'success': True, 'message': 'Roles y permisos restablecidos al estado predeterminado con éxito.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+

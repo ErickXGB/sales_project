@@ -3,31 +3,33 @@ from django.contrib.auth.models import Group, Permission
 
 # Diccionario: rol -> lista de codenames de permisos
 ROLES = {
-    # El Administrador recibe TODOS los permisos de facturación y compras
+    # El Administrador recibe TODOS los permisos de facturación, compras y pagos
     'Administrador': '__all__',
 
     # El Gerente puede consultar todo y generar reportes, pero no borrar/modificar/crear
     'Gerente': [
         'view_brand', 'view_productgroup', 'view_supplier', 'view_product',
         'view_customer', 'view_customerprofile', 'view_invoice', 'view_invoicedetail',
-        'view_purchase', 'view_purchasedetail',
+        'view_purchase', 'view_purchasedetail', 'view_cobrofactura', 'view_pagocompra',
     ],
 
-    # Compras administra Proveedores, Compras y Detalles de compra. Puede ver catálogo de productos.
+    # Compras administra Proveedores, Compras, Detalles de compra y Pagos de Compras.
     'Compras': [
         'view_brand', 'view_productgroup', 'view_product',
         'view_supplier', 'add_supplier', 'change_supplier', 'delete_supplier',
         'view_purchase', 'add_purchase', 'change_purchase', 'delete_purchase',
         'view_purchasedetail', 'add_purchasedetail', 'change_purchasedetail', 'delete_purchasedetail',
+        'view_pagocompra', 'add_pagocompra', 'change_pagocompra', 'delete_pagocompra',
     ],
 
-    # Ventas administra Clientes, Facturas (Ventas) y Detalles de venta. Puede ver catálogo de productos.
+    # Ventas administra Clientes, Facturas (Ventas), Detalles de venta y Cobros.
     'Ventas': [
         'view_product',
         'view_customer', 'add_customer', 'change_customer', 'delete_customer',
         'view_customerprofile', 'add_customerprofile', 'change_customerprofile', 'delete_customerprofile',
         'view_invoice', 'add_invoice', 'change_invoice', 'delete_invoice',
         'view_invoicedetail', 'add_invoicedetail', 'change_invoicedetail', 'delete_invoicedetail',
+        'view_cobrofactura', 'add_cobrofactura', 'change_cobrofactura', 'delete_cobrofactura',
     ],
 }
 
@@ -45,7 +47,7 @@ class Command(BaseCommand):
             group, created = Group.objects.get_or_create(name=role_name)
 
             if codenames == '__all__':
-                perms = Permission.objects.filter(content_type__app_label__in=['billing', 'purchasing'])
+                perms = Permission.objects.filter(content_type__app_label__in=['billing', 'purchasing', 'pagos'])
             else:
                 perms = Permission.objects.filter(codename__in=codenames)
 

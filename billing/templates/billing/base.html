@@ -29,43 +29,46 @@
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:supplier_list' %}">Proveedores</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:product_list' %}">Productos</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'purchasing:purchase_list' %}">Compras</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'pagos:pagos_compras_home' %}">Pagos de Compras</a></li>
           {% endif %}
 
           <!-- VENTAS: Vendedor y Administrador -->
           {% if user|has_group:'Ventas' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:customer_list' %}">Clientes</a></li>
           <li class="nav-item"><a class="nav-link" href="{% url 'billing:invoice_list' %}">Facturas</a></li>
+          <li class="nav-item"> <a class="nav-link" href="{% url 'pagos:pagos_home' %}">Cobros</a></li>
           {% endif %}
 
           <!-- SEGURIDAD: solo Administrador -->
           {% if user|has_group:'Administrador' %}
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
-              <i class="bi bi-shield-lock me-1"></i>Seguridad
-            </a>
-            <ul class="dropdown-menu">
-              <!--  <li><a class="dropdown-item" href="{% url 'security:register' %}"><i class="bi bi-person-plus me-1"></i>Registrarse</a></li> --> 
-              <li><a class="dropdown-item" href="{% url 'security:user_list' %}"><i class="bi bi-person-gear me-1"></i>Usuarios</a></li>
-              <li><a class="dropdown-item" href="{% url 'security:group_list' %}"><i class="bi bi-diagram-3 me-1"></i>Roles</a></li>
-              <li><a class="dropdown-item" href="{% url 'security:permission_list' %}"><i class="bi bi-key me-1"></i>Permisos</a></li>
-            </ul>
-          </li>
+                      <li class="nav-item"><a class="nav-link" href="{% url 'security:security_home' %}">Seguridad</a></li>
           {% endif %}
 
         {% endif %}
       </ul>
         <ul class="navbar-nav">
           {% if user.is_authenticated %}
-          <li class="nav-item"><span class="nav-link text-light">{{ user.username }}</span></li>
-          <li class="nav-item">
-            <form method="post" action="{% url 'logout' %}" class="d-inline">
-              {% csrf_token %}
-              <button type="submit" class="nav-link btn btn-link text-light" style="text-decoration:none;">
-                Cerrar Sesión
-              </button>
-            </form>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle text-light" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userDropdown" style="border-radius: 8px;">
+              <li>
+                <a class="dropdown-item py-2" href="{% url 'password_change' %}">
+                  <i class="bi bi-key me-2 text-primary"></i>Cambiar contraseña
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="{% url 'logout' %}" class="m-0">
+                  {% csrf_token %}
+                  <button type="submit" class="dropdown-item py-2 text-danger" style="background: none; border: none; width: 100%; text-align: left;">
+                    <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
+                  </button>
+                </form>
+              </li>
+            </ul>
           </li>
-
           {% else %}
           <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a></li>
           {% endif %}

@@ -11,10 +11,20 @@
             <div class="col-md-6">
                 <p><strong>Cliente:</strong> {{ invoice.customer.full_name }}</p>
                 <p><strong>DNI/RUC:</strong> {{ invoice.customer.dni }}</p>
+                <p><strong>Método de Pago:</strong> <span class="badge bg-secondary">{{ invoice.get_metodo_pago_display }}</span></p>
             </div>
             <div class="col-md-6 text-end">
                 <p><strong>Fecha:</strong> {{ invoice.invoice_date|date:"d/m/Y H:i" }}</p>
-                <p><strong>Factura #:</strong> {{ invoice.id }}</p>
+                <p><strong>Factura #:</strong> {{ invoice.numero|default:invoice.id }}</p>
+                <p><strong>Estado de Pago:</strong> 
+                    {% if invoice.estado == 'PAGADA' %}
+                        <span class="badge bg-success">Pagada</span>
+                    {% elif invoice.estado == 'PENDIENTE' %}
+                        <span class="badge bg-warning text-dark">Pendiente</span>
+                    {% else %}
+                        <span class="badge bg-danger">Anulada</span>
+                    {% endif %}
+                </p>
             </div>
         </div>
 
@@ -56,6 +66,15 @@
 
         <a href="{% url 'billing:invoice_list' %}" class="btn btn-secondary">Volver al listado</a>
         <a href="{% url 'billing:invoice_pdf' invoice.pk %}" class="btn btn-primary"><i class="bi bi-printer me-1"></i>Imprimir / PDF</a>
+        
+        {% if invoice.estado == 'PENDIENTE' and invoice.metodo_pago == 'PAYPAL' %}
+        <a href="{% url 'billing:invoice_paypal_checkout' invoice.pk %}" class="btn btn-warning fw-bold text-dark"><i class="bi bi-paypal me-1"></i>Pagar con PayPal</a>
+        {% endif %}
+
+        {% if invoice.whatsapp_phone %}
+        <a href="https://wa.me/{{ invoice.whatsapp_phone }}?text={{ invoice.whatsapp_message|urlencode }}" target="_blank" class="btn btn-success"><i class="bi bi-whatsapp me-1"></i>Enviar por WhatsApp</a>
+        {% endif %}
+
         <a href="{% url 'billing:invoice_delete' invoice.pk %}" class="btn btn-danger">Eliminar</a>
     </div>
 </div>

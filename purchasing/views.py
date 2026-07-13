@@ -59,6 +59,7 @@ def purchase_create(request):
         supplier_phone = request.POST.get('supplier_phone', '').strip() or None
         supplier_address = request.POST.get('supplier_address', '').strip() or None
         document_number = request.POST.get('document_number', '').strip()
+        tipo_pago = request.POST.get('tipo_pago', 'CREDITO').strip()
         
         product_ids = request.POST.getlist('product[]')
         quantities = request.POST.getlist('quantity[]')
@@ -138,7 +139,7 @@ def purchase_create(request):
         if errors:
             for err in errors:
                 messages.error(request, err)
-            return _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, product_ids, quantities, unit_costs)
+            return _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, tipo_pago, product_ids, quantities, unit_costs)
             
         try:
             with transaction.atomic():
@@ -169,6 +170,7 @@ def purchase_create(request):
                 purchase = Purchase.objects.create(
                     supplier=supplier,
                     document_number=document_number,
+                    tipo_pago=tipo_pago,
                     subtotal=subtotal,
                     tax=tax,
                     total=total,
@@ -191,7 +193,7 @@ def purchase_create(request):
             
         except Exception as e:
             messages.error(request, f"Error al guardar la compra: {str(e)}")
-            return _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, product_ids, quantities, unit_costs)
+            return _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, tipo_pago, product_ids, quantities, unit_costs)
             
     else:
         return _render_form(request)
@@ -231,7 +233,7 @@ def _render_form(request, context_opts=None):
     context.update(context_opts)
     return render(request, 'purchasing/purchase_form.html', context)
 
-def _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, product_ids, quantities, unit_costs):
+def _render_form_with_errors(request, supplier_select, supplier_name, supplier_contact_name, supplier_email, supplier_phone, supplier_address, document_number, tipo_pago, product_ids, quantities, unit_costs):
     posted_values = {
         'supplier_select': supplier_select,
         'supplier_name': supplier_name,
@@ -240,6 +242,7 @@ def _render_form_with_errors(request, supplier_select, supplier_name, supplier_c
         'supplier_phone': supplier_phone or '',
         'supplier_address': supplier_address or '',
         'document_number': document_number,
+        'tipo_pago': tipo_pago,
     }
     
     selected_items = []

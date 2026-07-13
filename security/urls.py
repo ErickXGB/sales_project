@@ -4,6 +4,9 @@ from . import views
 app_name = 'security'
 
 urlpatterns = [
+    # Panel Principal de Seguridad
+    path('', views.SecurityHomeView.as_view(), name='security_home'),
+
     # Autenticación
     path('register/', views.RegisterView.as_view(), name='register'),
     path('login/', views.SecurityLoginView.as_view(), name='login'),
@@ -18,6 +21,9 @@ urlpatterns = [
     # Roles (Group)
     path('roles/', views.GroupListView.as_view(), name='group_list'),
     path('roles/create/', views.GroupCreateView.as_view(), name='group_create'),
+    path('roles/update-permission/', views.update_group_permission, name='update_permission'),
+    path('roles/export-permissions/', views.export_permissions_json, name='export_permissions'),
+    path('roles/reset-permissions/', views.reset_permissions, name='reset_permissions'),
     path('roles/<int:pk>/edit/', views.GroupUpdateView.as_view(), name='group_update'),
     path('roles/<int:pk>/delete/', views.GroupDeleteView.as_view(), name='group_delete'),
 

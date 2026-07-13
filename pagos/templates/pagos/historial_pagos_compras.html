@@ -1,0 +1,75 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h2>{{ title }}</h2>
+
+<!-- Resumen de filtro de compra específica si aplica -->
+{% if purchase_filter %}
+<div class="alert alert-info border-0 mb-4 py-3 d-flex justify-content-between align-items-center">
+    <div>
+        <i class="bi bi-funnel-fill me-1"></i> Filtrado por Compra: <strong>{{ purchase_filter.document_number }}</strong> (Proveedor: {{ purchase_filter.supplier.name }})
+    </div>
+    <a href="{% url 'pagos:historial_pagos_compras' %}" class="btn btn-sm btn-outline-primary">Ver Todos los Pagos</a>
+</div>
+{% endif %}
+
+<!-- Buscador por campos -->
+<form method="get" class="mb-4">
+  <div class="input-group shadow-sm" style="max-width: 700px;">
+    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+      <option value="all" {% if search_field == 'all' %}selected{% endif %}>Todos los campos</option>
+      <option value="id" {% if search_field == 'id' %}selected{% endif %}>ID Pago</option>
+      <option value="numero" {% if search_field == 'numero' %}selected{% endif %}>Nº Factura Proveedor</option>
+      <option value="supplier_name" {% if search_field == 'supplier_name' %}selected{% endif %}>Proveedor (Nombre)</option>
+    </select>
+    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
+      placeholder="Ingrese el término a buscar..." value="{{ search_value }}">
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="{% if purchase_filter %}{% url 'pagos:historial_pago_compra' purchase_filter.id %}{% else %}{% url 'pagos:historial_pagos_compras' %}{% endif %}" class="btn btn-outline-secondary">Limpiar</a>
+  </div>
+</form>
+
+<div class="mb-3 d-flex gap-2">
+  <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Panel</a>
+</div>
+
+<table class="table table-striped table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>ID Pago</th>
+      <th>Factura Proveedor</th>
+      <th>Proveedor</th>
+      <th>Fecha de Pago</th>
+      <th class="text-end">Monto Pagado</th>
+      <th>Observación</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pago in items %}
+    <tr>
+      <td>{{ pago.id }}</td>
+      <td><span class="fw-bold">{{ pago.compra.document_number }}</span></td>
+      <td>{{ pago.compra.supplier.name }}</td>
+      <td>{{ pago.fecha|date:"d/m/Y" }}</td>
+      <td class="text-end fw-bold text-success">${{ pago.valor }}</td>
+      <td>{{ pago.observacion|default:"-" }}</td>
+      <td>
+        <a href="{% url 'pagos:editar_pago_compra' pago.pk %}" class="btn btn-sm btn-warning" title="Editar Pago">Editar</a>
+        <a href="{% url 'pagos:eliminar_pago_compra' pago.pk %}" class="btn btn-sm btn-danger" title="Eliminar/Revertir Pago">Eliminar</a>
+        {% if pago.compra.whatsapp_phone %}
+        <a href="https://wa.me/{{ pago.compra.whatsapp_phone }}?text={{ pago.compra.whatsapp_message|urlencode }}" target="_blank" class="btn btn-sm btn-success" title="Notificar por WhatsApp"><i class="bi bi-whatsapp"></i></a>
+        {% else %}
+        <button class="btn btn-sm btn-secondary" disabled title="Sin teléfono para WhatsApp"><i class="bi bi-whatsapp"></i></button>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" class="text-center">No se han registrado pagos que coincidan con la búsqueda.</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

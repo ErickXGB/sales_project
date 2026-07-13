@@ -1,0 +1,155 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center my-5">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+      <!-- Encabezado -->
+      <div class="card-header bg-dark text-white p-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <h4 class="fw-bold mb-0"><i class="bi bi-paypal text-info me-2"></i>Pago Seguro con PayPal</h4>
+            <small class="text-muted">Procesado de forma segura y encriptada</small>
+          </div>
+          <span class="fs-1 text-info"><i class="bi bi-lock-fill"></i></span>
+        </div>
+      </div>
+
+      <div class="card-body p-4">
+        <!-- Resumen de la Factura -->
+        <div class="alert alert-light border-0 shadow-sm p-4 mb-4 rounded-3">
+          <h5 class="fw-bold mb-3 text-secondary border-bottom pb-2">Resumen del Documento</h5>
+          <div class="row g-2">
+            <div class="col-6">
+              <span class="text-muted d-block small">Factura</span>
+              <span class="fw-bold text-dark fs-5">{{ invoice.numero|default:invoice.id }}</span>
+            </div>
+            <div class="col-6 text-end">
+              <span class="text-muted d-block small">Cliente</span>
+              <span class="fw-bold text-dark">{{ invoice.customer.full_name }}</span>
+            </div>
+            <div class="col-6 mt-3">
+              <span class="text-muted d-block small">Subtotal</span>
+              <span class="fw-semibold text-dark">${{ invoice.subtotal }}</span>
+            </div>
+            <div class="col-6 mt-3 text-end">
+              <span class="text-muted d-block small">IVA (15%)</span>
+              <span class="fw-semibold text-dark">${{ invoice.tax }}</span>
+            </div>
+            <div class="col-12 mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+              <span class="fw-bold text-dark fs-5">Monto Total a Pagar:</span>
+              <span class="fw-extrabold text-primary fs-3">${{ invoice.total }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Indicador de procesamiento -->
+        <div id="loading-spinner" class="text-center my-4" style="display: none;">
+          <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Procesando pago...</span>
+          </div>
+          <p class="mt-3 fw-bold text-primary">Capturando y verificando el pago con PayPal... Por favor no cierre esta ventana.</p>
+        </div>
+
+        <!-- Botones de PayPal o Alerta de Configuración -->
+        {% if paypal_client_id == "TU_CLIENT_ID_DE_PAYPAL_AQUI" or not paypal_client_id %}
+        <div class="alert alert-warning border-0 shadow-sm p-4 rounded-3 text-center">
+            <div class="fs-1 text-warning mb-2"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <h5 class="fw-bold">Falta Configurar PayPal</h5>
+            <p class="mb-0 text-muted small">Por favor, abre el archivo <code>.env</code> en tu editor y reemplaza <code>TU_CLIENT_ID_DE_PAYPAL_AQUI</code> con tu <strong>Client ID de Sandbox</strong> real. Luego reinicia el servidor de Django.</p>
+        </div>
+        {% else %}
+        <div id="paypal-button-container" class="mt-4"></div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+          <a href="{% url 'billing:invoice_detail' invoice.pk %}" class="btn btn-link text-muted small"><i class="bi bi-arrow-left me-1"></i>Volver al Detalle de Factura</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Incluir SDK de PayPal -->
+{% if paypal_client_id != "TU_CLIENT_ID_DE_PAYPAL_AQUI" and paypal_client_id %}
+<script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&currency=USD"></script>
+
+<script>
+  if (typeof paypal !== 'undefined') {
+    paypal.Buttons({
+      style: {
+        layout: 'vertical',
+        color:  'gold',
+        shape:  'rect',
+        label:  'paypal'
+      },
+      
+      // Crear la orden de pago
+      createOrder: function(data, actions) {
+        return actions.order.create({
+          purchase_units: [{
+            amount: {
+              value: '{{ invoice_total_paypal }}',
+              currency_code: 'USD'
+            },
+            description: 'Factura {{ invoice.numero|default:invoice.id }} - Sistema de Ventas'
+          }]
+        });
+      },
+
+      // Cuando el usuario aprueba el pago
+      onApprove: function(data, actions) {
+        // Ocultar botones y mostrar loader
+        document.getElementById('paypal-button-container').style.display = 'none';
+        document.getElementById('loading-spinner').style.display = 'block';
+
+        // Enviar el ID de orden y pagador a nuestro backend
+        return fetch('{% url "billing:invoice_paypal_capture" invoice.pk %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify({
+            orderID: data.orderID,
+            payerID: data.payerID
+          })
+        })
+        .then(function(res) {
+          return res.json();
+        })
+        .then(function(details) {
+          if (details.status === 'success') {
+            // Redirigir al detalle con el mensaje de éxito
+            window.location.href = '{% url "billing:invoice_detail" invoice.pk %}';
+          } else {
+            alert('Error al verificar el pago en el servidor: ' + details.message);
+            document.getElementById('paypal-button-container').style.display = 'block';
+            document.getElementById('loading-spinner').style.display = 'none';
+          }
+        })
+        .catch(function(err) {
+          alert('Ocurrió un error al intentar comunicarse con el servidor: ' + err);
+          document.getElementById('paypal-button-container').style.display = 'block';
+          document.getElementById('loading-spinner').style.display = 'none';
+        });
+      },
+
+      // Error en el proceso
+      onError: function(err) {
+        alert('Se produjo un error durante el proceso de pago con PayPal: ' + err);
+      }
+    }).render('#paypal-button-container');
+  } else {
+    document.getElementById('paypal-button-container').innerHTML = `
+      <div class="alert alert-danger border-0 text-center">
+        <h6 class="fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>Error al cargar el SDK de PayPal</h6>
+        <p class="mb-0 small text-muted">Asegúrate de que la clave del cliente configurada sea correcta y que tengas conexión a internet.</p>
+      </div>
+    `;
+  }
+</script>
+{% endif %}
+
+{% endblock %}

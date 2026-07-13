@@ -17,6 +17,21 @@ class Purchase(models.Model):
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
  
+    # Nuevos campos para pagos de compras
+    tipo_pago = models.CharField(
+        max_length=10,
+        choices=[('CONTADO', 'Contado'), ('CREDITO', 'Crédito')],
+        default='CREDITO',
+        verbose_name='Tipo de Pago'
+    )
+    saldo = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, verbose_name='Saldo')
+    estado = models.CharField(
+        max_length=15,
+        choices=[('PENDIENTE', 'Pendiente'), ('PAGADA', 'Pagada'), ('ANULADA', 'Anulada')],
+        default='PENDIENTE',
+        verbose_name='Estado'
+    )
+
     class Meta:
         verbose_name = 'Purchase'
         verbose_name_plural = 'Purchases'
@@ -27,6 +42,45 @@ class Purchase(models.Model):
  
     def __str__(self):
         return f'Purchase #{self.id} - {self.supplier}'
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new:
+            if self.tipo_pago == 'CREDITO':
+                self.saldo = self.total
+                self.estado = 'PENDIENTE'
+            else:
+                self.saldo = 0.00
+                self.estado = 'PAGADA'
+        super().save(*args, **kwargs)
+
+    @property
+    def whatsapp_phone(self):
+        """Devuelve el número de teléfono del proveedor formateado para WhatsApp (solo dígitos)."""
+        if not self.supplier.phone:
+            return ""
+        cleaned = "".join(c for c in self.supplier.phone if c.isdigit())
+        if len(cleaned) == 10 and cleaned.startswith('0'):
+            cleaned = '593' + cleaned[1:]
+        elif len(cleaned) == 9 and cleaned.startswith('9'):
+            cleaned = '593' + cleaned
+        return cleaned
+
+    @property
+    def whatsapp_message(self):
+        """Genera el mensaje pre-redactado para enviar al proveedor por WhatsApp."""
+        msg = (
+            f"Hola *{self.supplier.name}*,\n\n"
+            f"Le informamos que hemos registrado un abono/pago sobre la *Compra #{self.document_number}* por nuestra adquisición del {self.purchase_date.strftime('%d/%m/%Y')}.\n\n"
+            f"*Detalles de la Transacción:*\n"
+            f"- Subtotal: ${self.subtotal}\n"
+            f"- IVA (15%): ${self.tax}\n"
+            f"- Total de Compra: ${self.total}\n"
+            f"- Saldo Restante: ${self.saldo}\n"
+            f"- Estado de Pago: {self.get_estado_display()}\n\n"
+            f"Saludos cordiales."
+        )
+        return msg
  
  
 class PurchaseDetail(models.Model):

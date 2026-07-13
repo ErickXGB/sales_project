@@ -25,6 +25,7 @@ urlpatterns = [
     path('', include('billing.urls')),
     path('purchases/', include('purchasing.urls')),
     path('security/', include('security.urls')),   # NUEVA
+    path('cobros/', include('pagos.urls', namespace='pagos')),
 ]
 
 if settings.DEBUG:

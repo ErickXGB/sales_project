@@ -1,0 +1,102 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-dark text-white py-3">
+        <h4 class="card-title mb-0 fw-bold"><i class="bi bi-cash-coin me-2"></i>{{ title }}</h4>
+      </div>
+      <div class="card-body p-4">
+        
+        <!-- Resumen de la compra -->
+        <div class="alert alert-secondary border-0 mb-4 py-3">
+            <h6 class="fw-bold mb-3"><i class="bi bi-info-circle-fill me-2"></i>Detalles de la Cuenta por Pagar</h6>
+            <div class="row g-2">
+                <div class="col-6">
+                    <small class="text-muted d-block">Factura Proveedor</small>
+                    <span class="fw-bold">{{ purchase.document_number }}</span>
+                </div>
+                <div class="col-6">
+                    <small class="text-muted d-block">Proveedor</small>
+                    <span class="fw-bold">{{ purchase.supplier.name }}</span>
+                </div>
+                <div class="col-6 mt-2">
+                    <small class="text-muted d-block">Total de la Compra</small>
+                    <span class="fw-semibold">${{ purchase.total }}</span>
+                </div>
+                <div class="col-6 mt-2">
+                    <small class="text-muted d-block text-danger">Saldo Pendiente Actual</small>
+                    <span class="fw-bold text-danger fs-5">${{ purchase.saldo }}</span>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          
+          <!-- Errores no relacionados con campos -->
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                <p class="mb-0">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+          
+          <!-- Campo Fecha -->
+          <div class="mb-3">
+            <label for="{{ form.fecha.id_for_label }}" class="form-label fw-bold">Fecha del Pago</label>
+            {{ form.fecha }}
+            {% if form.fecha.errors %}
+              <div class="text-danger mt-1">
+                {% for error in form.fecha.errors %}
+                  <small class="d-block">{{ error }}</small>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Campo Valor -->
+          <div class="mb-3">
+            <label for="{{ form.valor.id_for_label }}" class="form-label fw-bold">Monto a Pagar ($)</label>
+            {{ form.valor }}
+            {% if form.valor.errors %}
+              <div class="text-danger mt-1">
+                {% for error in form.valor.errors %}
+                  <small class="d-block">{{ error }}</small>
+                {% endfor %}
+              </div>
+            {% endif %}
+            <small class="text-muted mt-1 d-block">Ingrese el valor del abono. No puede superar el saldo pendiente de la compra.</small>
+          </div>
+
+          <!-- Campo Observación -->
+          <div class="mb-4">
+            <label for="{{ form.observacion.id_for_label }}" class="form-label fw-bold">Observación / Notas</label>
+            {{ form.observacion }}
+            {% if form.observacion.errors %}
+              <div class="text-danger mt-1">
+                {% for error in form.observacion.errors %}
+                  <small class="d-block">{{ error }}</small>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Botones de Acción -->
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'pagos:compras_pendientes' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-success fw-bold">
+              {% if action == 'create' %}Registrar Pago{% else %}Guardar Cambios{% endif %}
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

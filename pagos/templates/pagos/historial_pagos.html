@@ -1,0 +1,121 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>{{ title }}</h2>
+  <div class="d-flex gap-2">
+    {% if invoice %}
+    {% if invoice.estado != 'PAGADA' %}
+    <a href="{% url 'pagos:registrar_pago' invoice.id %}" class="btn btn-success">
+      <i class="bi bi-plus-circle me-1"></i>Registrar Abono
+    </a>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="mb-3 d-flex gap-2">
+  <a href="{% url 'pagos:pagos_home' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Panel</a>
+</div>
+
+{% if invoice %}
+<!-- Ficha Informativa de la Factura -->
+<div class="card bg-light border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <span class="text-secondary small d-block">Número de Factura:</span>
+        <strong class="fs-5 text-dark">{{ invoice.numero|default:"-" }}</strong>
+      </div>
+      <div class="col-md-3">
+        <span class="text-secondary small d-block">Cliente:</span>
+        <span class="fs-5 text-dark">{{ invoice.customer.full_name }}</span>
+      </div>
+      <div class="col-md-2">
+        <span class="text-secondary small d-block">Total Facturado:</span>
+        <span class="fs-5 fw-semibold text-dark">${{ invoice.total }}</span>
+      </div>
+      <div class="col-md-2">
+        <span class="text-secondary small d-block">Saldo Pendiente:</span>
+        <span class="fs-5 fw-bold {% if invoice.saldo == 0 %}text-success{% else %}text-danger{% endif %}">${{ invoice.saldo }}</span>
+      </div>
+      <div class="col-md-2">
+        <span class="text-secondary small d-block">Estado de Cobro:</span>
+        {% if invoice.estado == 'PAGADA' %}
+        <span class="badge bg-success fs-6 px-3 py-2">PAGADA</span>
+        {% elif invoice.estado == 'PENDIENTE' %}
+        <span class="badge bg-warning text-dark fs-6 px-3 py-2">PENDIENTE</span>
+        {% else %}
+        <span class="badge bg-danger fs-6 px-3 py-2">{{ invoice.estado }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<!-- Buscador de pagos global -->
+<form method="get" class="mb-4">
+  <div class="input-group shadow-sm" style="max-width: 600px;">
+    <span class="input-group-text bg-light text-secondary"><i class="bi bi-search"></i></span>
+    <input type="text" name="search_value" class="form-control border-secondary-subtle"
+      placeholder="Buscar por Nº factura, cliente u observaciones..." value="{{ search_value|default:'' }}">
+    <button type="submit" class="btn btn-primary">Buscar</button>
+    <a href="{% url 'pagos:historial_pagos' %}" class="btn btn-outline-secondary">Limpiar</a>
+  </div>
+</form>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-striped table-hover mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>ID Cobro</th>
+          {% if not invoice %}
+          <th>Factura</th>
+          <th>Cliente</th>
+          {% endif %}
+          <th>Fecha Cobro</th>
+          <th class="text-end">Monto Cobrado</th>
+          <th>Observación</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for payment in items %}
+        <tr>
+          <td>#{{ payment.id }}</td>
+          {% if not invoice %}
+          <td><strong>{{ payment.factura.numero|default:payment.factura.id }}</strong></td>
+          <td>{{ payment.factura.customer.full_name }}</td>
+          {% endif %}
+          <td>{{ payment.fecha|date:"d/m/Y" }}</td>
+          <td class="text-end fw-bold text-success">${{ payment.valor }}</td>
+          <td>{{ payment.observacion|default:"-" }}</td>
+          <td class="text-center">
+            <a href="{% url 'pagos:editar_pago' payment.id %}" class="btn btn-sm btn-warning" title="Editar Pago">
+              <i class="bi bi-pencil-square"></i> Editar
+            </a>
+            {% if payment.factura.estado == 'PAGADA' %}
+            <button class="btn btn-sm btn-outline-danger" disabled
+              title="No se puede eliminar un pago de una factura totalmente pagada">
+              <i class="bi bi-trash"></i> Eliminar
+            </button>
+            {% else %}
+            <a href="{% url 'pagos:eliminar_pago' payment.id %}" class="btn btn-sm btn-danger" title="Eliminar Pago">
+              <i class="bi bi-trash"></i> Eliminar
+            </a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="{% if invoice %}5{% else %}7{% endif %}" class="text-center text-muted py-4">No se han registrado
+            cobros.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

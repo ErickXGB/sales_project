@@ -177,7 +177,7 @@ class CustomerForm(forms.ModelForm):
             'first_name': forms.TextInput(attrs={'class':'form-control', 'placeholder': 'Ej. María Elena'}),
             'last_name': forms.TextInput(attrs={'class':'form-control', 'placeholder': 'Ej. Pazmiño Rodríguez'}),
             'email': forms.EmailInput(attrs={'class':'form-control', 'placeholder': 'Ej. maria.paz@example.com'}),
-            'phone': forms.TextInput(attrs={'class':'form-control', 'placeholder': 'Ej. 0998765432'}),
+            'phone': forms.TextInput(attrs={'class':'form-control', 'placeholder': 'Ej. 0998765432 o +593998765432'}),
             'address': forms.Textarea(attrs={'class':'form-control', 'rows': 3, 'placeholder': 'Ej. Av. De la República E7-12 y Almagro, Quito'}),
             'is_active': forms.CheckboxInput(attrs={'class':'form-check-input'}),
         }
@@ -194,9 +194,10 @@ class CustomerForm(forms.ModelForm):
     def clean_phone(self):
         phone = self.cleaned_data.get('phone')
         if phone:
+            # Preservar el signo '+' al inicio para prefijos internacionales y quitar espacios/guiones
             phone_cleaned = re.sub(r'\s+|-', '', phone)
-            if not re.match(r'^\d+$', phone_cleaned):
-                raise forms.ValidationError("El teléfono solo debe contener números.")
+            if not re.match(r'^\+?\d+$', phone_cleaned):
+                raise forms.ValidationError("El teléfono solo debe contener números y opcionalmente empezar con el signo '+' para el prefijo del país.")
             return phone_cleaned
         return phone
 

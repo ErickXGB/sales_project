@@ -60,7 +60,7 @@
                 <input type="text" name="customer_address" id="customer_address" class="form-control"
                   placeholder="Ej. Av. de la República E7-12">
               </div>
-              <div class="col-md-6">
+              <div class="col-md-6" id="taxpayer-type-container">
                 <label for="customer_taxpayer_type" class="form-label">Tipo de Contribuyente</label>
                 <select name="customer_taxpayer_type" id="customer_taxpayer_type" class="form-select">
                   <option value="final">Consumidor Final</option>
@@ -71,10 +71,9 @@
               <div class="col-md-6">
                 <label for="customer_payment_terms" class="form-label">Términos de Pago</label>
                 <select name="customer_payment_terms" id="customer_payment_terms" class="form-select">
-                  <option value="cash">Contado</option>
-                  <option value="credit_15">15 días</option>
-                  <option value="credit_30">30 días</option>
-                  <option value="credit_60">60 días</option>
+                  <option value="cash">Contado (Efectivo/Transferencia)</option>
+                  <option value="paypal">Contado (PayPal)</option>
+                  <option value="credit">Crédito</option>
                 </select>
               </div>
             </div>
@@ -132,7 +131,7 @@
 
       <!-- Acciones de guardado -->
       <div class="d-flex justify-content-end gap-2">
-        <a href="{% url 'billing:invoice_list' %}" class="btn btn-secondary">Cancelarar</a>
+        <a href="{% url 'billing:invoice_list' %}" class="btn btn-secondary">Cancelar</a>
         <button type="submit" class="btn btn-warning fw-bold text-dark">
           Guardar Factura
         </button>
@@ -169,16 +168,23 @@
   // Controlar campos de clientes
   clientSelect.addEventListener('change', function () {
     const val = this.value;
+    const taxpayerContainer = document.getElementById('taxpayer-type-container');
+    const paymentTermsSelect = document.querySelector('#customer_payment_terms');
+    
     if (val === '') {
       clientFields.style.display = 'none';
       clearClientFields();
       setClientFieldsRequired(false);
+      if (paymentTermsSelect) paymentTermsSelect.disabled = false;
     } else if (val === 'new') {
       clientFields.style.display = 'block';
+      if (taxpayerContainer) taxpayerContainer.style.display = 'block';
       clearClientFields();
       setClientFieldsRequired(true);
+      if (paymentTermsSelect) paymentTermsSelect.disabled = false;
     } else {
       clientFields.style.display = 'block';
+      if (taxpayerContainer) taxpayerContainer.style.display = 'none';
       const client = customersData.find(c => c.id == val);
       if (client) {
         document.querySelector('#customer_dni').value = client.dni;
@@ -189,6 +195,15 @@
         document.querySelector('#customer_address').value = client.address || '';
         document.querySelector('#customer_taxpayer_type').value = client.taxpayer_type;
         document.querySelector('#customer_payment_terms').value = client.payment_terms;
+        
+        if (client.dni === '9999999999') {
+          if (paymentTermsSelect) {
+            paymentTermsSelect.value = 'cash';
+            paymentTermsSelect.disabled = true;
+          }
+        } else {
+          if (paymentTermsSelect) paymentTermsSelect.disabled = false;
+        }
       }
       setClientFieldsRequired(true);
     }
@@ -318,9 +333,28 @@
 
   // Carga inicial
   window.addEventListener('load', function () {
+    const taxpayerContainer = document.getElementById('taxpayer-type-container');
+    const paymentTermsSelect = document.querySelector('#customer_payment_terms');
+    
+    // Habilitar campos deshabilitados al enviar el formulario para que se posteen los datos
+    const form = document.querySelector('#invoice-form');
+    if (form) {
+      form.addEventListener('submit', function() {
+        if (paymentTermsSelect) {
+          paymentTermsSelect.disabled = false;
+        }
+      });
+    }
+
     if (postedValues) {
       clientSelect.value = postedValues.customer_select;
       clientFields.style.display = postedValues.customer_select !== '' ? 'block' : 'none';
+
+      if (postedValues.customer_select === 'new') {
+        if (taxpayerContainer) taxpayerContainer.style.display = 'block';
+      } else if (postedValues.customer_select !== '') {
+        if (taxpayerContainer) taxpayerContainer.style.display = 'none';
+      }
 
       document.querySelector('#customer_dni').value = postedValues.customer_dni || '';
       document.querySelector('#customer_first_name').value = postedValues.customer_first_name || '';
@@ -330,6 +364,15 @@
       document.querySelector('#customer_address').value = postedValues.customer_address || '';
       document.querySelector('#customer_taxpayer_type').value = postedValues.customer_taxpayer_type || 'final';
       document.querySelector('#customer_payment_terms').value = postedValues.customer_payment_terms || 'cash';
+
+      if (postedValues.customer_dni === '9999999999') {
+        if (paymentTermsSelect) {
+          paymentTermsSelect.value = 'cash';
+          paymentTermsSelect.disabled = true;
+        }
+      } else {
+        if (paymentTermsSelect) paymentTermsSelect.disabled = false;
+      }
 
       setClientFieldsRequired(postedValues.customer_select !== '');
     } else {

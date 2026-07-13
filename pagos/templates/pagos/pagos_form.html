@@ -1,0 +1,118 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8 col-lg-6">
+    <div class="card shadow-lg border-0 mb-4" style="border-radius: 16px;">
+      <div class="card-header text-white" style="background: linear-gradient(135deg, #1f4e78 0%, #2f5597 100%); border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 1.25rem;">
+        <h4 class="mb-0"><i class="bi bi-cash-coin me-2"></i>{{ title }}</h4>
+      </div>
+      <div class="card-body p-4">
+        
+        <!-- Info de la Factura -->
+        <div class="p-3 mb-4 rounded bg-light border-start border-primary border-4">
+          <h5 class="text-primary mb-3"><i class="bi bi-file-earmark-text-fill me-1"></i>Detalles de Factura</h5>
+          <div class="row g-2">
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Número de Factura:</span>
+              <strong class="fs-6 text-dark">{{ invoice.numero|default:"-" }}</strong>
+            </div>
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Cliente:</span>
+              <strong class="fs-6 text-dark">{{ invoice.customer.full_name }}</strong>
+            </div>
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Fecha Emisión:</span>
+              <span class="text-dark">{{ invoice.invoice_date|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Total Facturado:</span>
+              <span class="fw-semibold text-dark">${{ invoice.total }}</span>
+            </div>
+            <div class="col-sm-12">
+              <hr class="my-2">
+            </div>
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Saldo Pendiente Actual:</span>
+              <span class="fw-bold text-danger fs-5">${{ invoice.saldo }}</span>
+            </div>
+            {% if action == 'update' %}
+            <div class="col-sm-6">
+              <span class="text-secondary small d-block">Valor del Abono Original:</span>
+              <span class="fw-bold text-info fs-5">${{ object.valor }}</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+          
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2">
+            {% for error in form.non_field_errors %}
+              <div><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label for="{{ form.fecha.id_for_label }}" class="form-label fw-semibold text-secondary">
+              Fecha de Cobro
+            </label>
+            {{ form.fecha }}
+            {% if form.fecha.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.fecha.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.valor.id_for_label }}" class="form-label fw-semibold text-secondary">
+              Valor del Abono (USD)
+            </label>
+            {{ form.valor }}
+            {% if form.valor.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.valor.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+            <div class="form-text text-muted small">
+              El valor debe ser mayor que cero y no puede superar el saldo pendiente disponible.
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label for="{{ form.observacion.id_for_label }}" class="form-label fw-semibold text-secondary">
+              Observación / Comentario
+            </label>
+            {{ form.observacion }}
+            {% if form.observacion.errors %}
+            <div class="text-danger small mt-1">
+              {% for error in form.observacion.errors %}{{ error }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 border-top pt-3">
+            {% if action == 'create' %}
+              <a href="{% url 'pagos:facturas_pendientes' %}" class="btn btn-secondary">
+                <i class="bi bi-x-circle me-1"></i>Cancelar
+              </a>
+            {% else %}
+              <a href="{% url 'pagos:historial_factura' invoice.id %}" class="btn btn-secondary">
+                <i class="bi bi-x-circle me-1"></i>Cancelar
+              </a>
+            {% endif %}
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-save me-1"></i>Guardar Abono
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

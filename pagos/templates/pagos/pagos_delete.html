@@ -1,0 +1,41 @@
+{% extends 'billing/base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-lg border-0" style="border-radius: 16px;">
+      <div class="card-header bg-danger text-white p-3" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ title }}</h4>
+      </div>
+      <div class="card-body p-4">
+        <p class="fs-5">¿Está seguro de que desea eliminar este cobro?</p>
+        
+        <div class="alert alert-warning">
+          <strong><i class="bi bi-info-circle-fill me-1"></i>Detalles del Cobro a Eliminar:</strong>
+          <ul class="mb-0 mt-2 list-unstyled">
+            <li><strong>Cobro ID:</strong> #{{ object.id }}</li>
+            <li><strong>Factura:</strong> {{ object.factura.numero|default:object.factura.id }}</li>
+            <li><strong>Fecha de Registro:</strong> {{ object.fecha|date:"d/m/Y" }}</li>
+            <li><strong>Valor:</strong> ${{ object.valor }}</li>
+            <li><strong>Observación:</strong> {{ object.observacion|default:"(Ninguna)" }}</li>
+          </ul>
+        </div>
+        
+        <p class="text-danger small fw-semibold">
+          <i class="bi-info-circle-fill me-1"></i>Esta acción sumará de nuevo el valor de <strong>${{ object.valor }}</strong> al saldo pendiente de la factura.
+        </p>
+
+        <form method="post" class="d-flex justify-content-end gap-2 border-top pt-3">
+          {% csrf_token %}
+          <a href="{% url 'pagos:historial_factura' invoice.id %}" class="btn btn-secondary">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </a>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-trash me-1"></i>Confirmar Eliminación
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends 'billing/base.html' %}
+{% block title %}Panel de Cobros{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="fw-bold text-dark"><i class="bi bi-wallet2 me-2 text-primary"></i>Panel de Cobros y Cuentas por Cobrar</h3>
+    <div class="d-flex gap-2">
+        <a href="{% url 'pagos:facturas_pendientes' %}" class="btn btn-outline-primary"><i class="bi bi-hourglass-split me-1"></i>Facturas Pendientes</a>
+        <a href="{% url 'pagos:facturas_pagadas' %}" class="btn btn-outline-success"><i class="bi bi-check-circle me-1"></i>Facturas Pagadas</a>
+        <a href="{% url 'pagos:historial_pagos' %}" class="btn btn-outline-secondary"><i class="bi bi-clock-history me-1"></i>Historial de Cobros</a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-4 mb-5">
+    <!-- Total Pendiente -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-warning border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Saldo Pendiente de Cobro</span>
+                    <span class="fs-3 text-warning"><i class="bi bi-exclamation-circle-fill"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-1">${{ total_pendientes_monto|floatformat:2 }}</h2>
+                <p class="text-muted mb-0 small">{{ total_pendientes_count }} facturas pendientes de cobro</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Total Cobrado -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-success border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Total Cobrado</span>
+                    <span class="fs-3 text-success"><i class="bi bi-cash-coin"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-1">${{ total_cobros_monto|floatformat:2 }}</h2>
+                <p class="text-muted mb-0 small">{{ total_cobros_count }} abonos/cobros registrados</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tasa de Cobro -->
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm border-0 border-top border-primary border-4">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fw-semibold">Tasa de Efectividad de Cobro</span>
+                    <span class="fs-3 text-primary"><i class="bi bi-graph-up-arrow"></i></span>
+                </div>
+                <h2 class="fw-bold text-dark mb-2">{{ porcentaje_cobrado }}%</h2>
+                <div class="progress mb-0" style="height: 8px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ porcentaje_cobrado }}%" aria-valuenow="{{ porcentaje_cobrado }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Facturas con Mayor Saldo Pendiente (Críticas) -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="bi bi-shield-fill-exclamation me-2 text-danger"></i>Cuentas por Cobrar Prioritarias
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Factura</th>
+                                <th>Cliente</th>
+                                <th class="text-end">Saldo Pendiente</th>
+                                <th class="text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in top_pending_invoices %}
+                            <tr>
+                                <td>
+                                    <span class="fw-bold text-primary">{{ inv.numero|default:inv.id }}</span>
+                                    <br><small class="text-muted">{{ inv.invoice_date|date:"d/m/Y" }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ inv.customer.full_name }}</div>
+                                    <small class="text-muted">Tlf: {{ inv.customer.phone|default:"-" }}</small>
+                                </td>
+                                <td class="text-end fw-bold text-danger">${{ inv.saldo }}</td>
+                                <td class="text-center">
+                                    <a href="{% url 'pagos:registrar_pago' inv.id %}" class="btn btn-sm btn-success" title="Registrar Cobro">
+                                        <i class="bi bi-plus-circle me-1"></i>Cobrar
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">No hay facturas pendientes de cobro. ¡Buen trabajo! 🎉</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Últimos Cobros Registrados -->
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-light border-0 py-3">
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="bi bi-clock-history me-2 text-success"></i>Cobros Recientes
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Factura / Cliente</th>
+                                <th class="text-end">Monto Cobrado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cobro in recent_cobros %}
+                            <tr>
+                                <td>{{ cobro.fecha|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ cobro.factura.numero|default:cobro.factura.id }}</div>
+                                    <small class="text-muted">{{ cobro.factura.customer.full_name }}</small>
+                                </td>
+                                <td class="text-end fw-bold text-success">+${{ cobro.valor }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-3">No se han registrado cobros recientemente.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

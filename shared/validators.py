@@ -23,6 +23,10 @@ def validate_cedula_ec(value):
         validate_cedula_ec("0912345678")  # Válida o lanza error
     """
 
+    # --- Permitir Consumidor Final ---
+    if value in ('9999999999', '9999999999999'):
+        return value
+
     # --- Paso 1: Verificar que solo contenga números ---
     if not value.isdigit():
         raise ValidationError(
