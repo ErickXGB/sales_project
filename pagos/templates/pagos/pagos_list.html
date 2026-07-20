@@ -5,26 +5,30 @@
   <h2>{{ title }}</h2>
 </div>
 
-<!-- Buscador por campos (Compacto) -->
-<form method="get" class="mb-4">
-  <div class="input-group shadow-sm" style="max-width: 700px;">
-    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
-    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
-      <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
-      <option value="id" {% if search_field == 'id' %}selected{% endif %}>ID Factura</option>
-      <option value="numero" {% if search_field == 'numero' %}selected{% endif %}>Nº Factura</option>
-      <option value="customer_name" {% if search_field == 'customer_name' %}selected{% endif %}>Cliente (Nombre)</option>
-      <option value="customer_dni" {% if search_field == 'customer_dni' %}selected{% endif %}>DNI/RUC Cliente</option>
-    </select>
-    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
-      placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
-    <button type="submit" class="btn btn-primary">Buscar</button>
-    <a href="{% url 'pagos:facturas_pendientes' %}" class="btn btn-outline-secondary">Limpiar</a>
-  </div>
-</form>
+<!-- Buscador y Acciones (Alineados) -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <form method="get" class="m-0 flex-grow-1" style="max-width: 700px;">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+      <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+        <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
+        <option value="id" {% if search_field == 'id' %}selected{% endif %}>ID Factura</option>
+        <option value="numero" {% if search_field == 'numero' %}selected{% endif %}>Nº Factura</option>
+        <option value="customer_name" {% if search_field == 'customer_name' %}selected{% endif %}>Cliente (Nombre)</option>
+        <option value="customer_dni" {% if search_field == 'customer_dni' %}selected{% endif %}>DNI/RUC Cliente</option>
+      </select>
+      <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
+        placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
+      <button type="submit" class="btn btn-primary">Buscar</button>
+      <a href="{% url 'pagos:facturas_pendientes' %}" class="btn btn-outline-secondary">Limpiar</a>
+    </div>
+  </form>
 
-<div class="mb-3 d-flex gap-2">
-  <a href="{% url 'pagos:pagos_home' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Panel</a>
+  <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+    <a href="{% url 'pagos:pagos_home' %}" class="btn btn-action-back d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-arrow-left"></i> Volver al Panel
+    </a>
+  </div>
 </div>
 
 <div class="card shadow-sm">
@@ -55,17 +59,23 @@
             <span class="badge bg-warning text-dark">Pendiente</span>
           </td>
           <td class="text-center">
+            {% if perms.pagos.add_cobrofactura %}
             <a href="{% url 'pagos:registrar_pago' inv.id %}" class="btn btn-sm btn-success" title="Registrar Pago">
               <i class="bi bi-cash me-1"></i>Cobrar / Abonar
             </a>
+            {% endif %}
+            {% if perms.pagos.view_cobrofactura %}
             <a href="{% url 'pagos:historial_factura' inv.id %}" class="btn btn-sm btn-info text-white"
               title="Ver Historial de Cobros">
               <i class="bi bi-list-check me-1"></i>Ver Pagos
             </a>
+            {% endif %}
+            {% if perms.billing.detail_invoice %}
             <a href="{% url 'billing:invoice_detail' inv.id %}" class="btn btn-sm btn-secondary"
               title="Detalle de Factura" target="_blank">
               <i class="bi bi-eye"></i>
             </a>
+            {% endif %}
           </td>
         </tr>
         {% empty %}
@@ -78,4 +88,5 @@
     </table>
   </div>
 </div>
+{% include 'shared/pagination.html' %}
 {% endblock %}

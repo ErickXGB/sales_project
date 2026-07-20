@@ -39,6 +39,12 @@ class Purchase(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['supplier', 'document_number'], name='unique_supplier_document')
         ]
+        permissions = [
+            ("download_purchase_pdf", "Can download Purchase PDF report"),
+            ("download_purchase_excel", "Can download Purchase Excel report"),
+            ("detail_purchase", "Can view Purchase detail page"),
+            ("whatsapp_purchase", "Can send Purchase via WhatsApp"),
+        ]
  
     def __str__(self):
         return f'Purchase #{self.id} - {self.supplier}'

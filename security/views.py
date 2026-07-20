@@ -70,6 +70,7 @@ class UserListView(AdminOnlyMixin, ListView):
     model = User
     template_name = 'security/user_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
 class AdminUserCreateView(AdminOnlyMixin, CreateView):
     """El Administrador crea un usuario con contraseña manual y envía credenciales por correo."""
@@ -125,6 +126,7 @@ class GroupListView(AdminOnlyMixin, ListView):
     model = Group
     template_name = 'security/group_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -138,21 +140,33 @@ class GroupListView(AdminOnlyMixin, ListView):
             {'label': 'Cliente', 'codename_base': 'customer'},
             {'label': 'Factura', 'codename_base': 'invoice'},
             {'label': 'Compra', 'codename_base': 'purchase'},
+            {'label': 'Cobro Factura', 'codename_base': 'cobrofactura'},
+            {'label': 'Pago Compra', 'codename_base': 'pagocompra'},
             {'label': 'Usuario', 'codename_base': 'user'},
+            {'label': 'Sobretiempo', 'codename_base': 'sobretiempo'},
         ]
         
         actions = [
             {'suffix': 'view', 'label': 'Leer'},
+            {'suffix': 'detail', 'label': 'Detalle'},
             {'suffix': 'add', 'label': 'Crear'},
             {'suffix': 'change', 'label': 'Editar'},
             {'suffix': 'delete', 'label': 'Eliminar'},
+            {'suffix': 'download_pdf', 'label': 'PDF'},
+            {'suffix': 'download_excel', 'label': 'Excel'},
+            {'suffix': 'whatsapp', 'label': 'WhatsApp'},
         ]
         
         # Generar lista plana de columnas para facilitar el rendering
         columns = []
         for mc in models_config:
             for act in actions:
-                codename = f"{act['suffix']}_{mc['codename_base']}"
+                if act['suffix'] == 'download_pdf':
+                    codename = f"download_{mc['codename_base']}_pdf"
+                elif act['suffix'] == 'download_excel':
+                    codename = f"download_{mc['codename_base']}_excel"
+                else:
+                    codename = f"{act['suffix']}_{mc['codename_base']}"
                 columns.append({
                     'codename': codename,
                     'label': f"{act['label']} {mc['label']}",
@@ -164,9 +178,12 @@ class GroupListView(AdminOnlyMixin, ListView):
         context['actions'] = actions
         context['matrix_columns'] = columns
         
+        from django.contrib.auth.models import Permission
+        context['db_permissions'] = set(Permission.objects.values_list('codename', flat=True))
+        
         # Preparar datos de filas
         groups_data = []
-        for g in Group.objects.all().prefetch_related('permissions'):
+        for g in context['object_list'].prefetch_related('permissions'):
             g_perms = set(p.codename for p in g.permissions.all())
             groups_data.append({
                 'group': g,
@@ -201,6 +218,7 @@ class PermissionListView(AdminOnlyMixin, ListView):
     template_name = 'security/permission_list.html'
     context_object_name = 'items'
     queryset = Permission.objects.select_related('content_type')
+    paginate_by = 10
 
 class PermissionCreateView(AdminOnlyMixin, CreateView):
     model = Permission
@@ -275,4 +293,77 @@ def reset_permissions(request):
         return JsonResponse({'success': True, 'message': 'Roles y permisos restablecidos al estado predeterminado con éxito.'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+class UserPermissionsView(AdminOnlyMixin, TemplateView):
+    template_name = 'security/user_permissions.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from django.shortcuts import get_object_or_404
+        user = get_object_or_404(User, pk=self.kwargs.get('pk'))
+        
+        # User direct permissions
+        direct_perms = set(p.codename for p in user.user_permissions.all())
+        
+        # User inherited permissions from their groups
+        inherited_perms = set()
+        for group in user.groups.all():
+            inherited_perms.update(p.codename for p in group.permissions.all())
+            
+        models_config = [
+            {'label': 'Marca', 'codename_base': 'brand'},
+            {'label': 'Categoría', 'codename_base': 'productgroup'},
+            {'label': 'Proveedor', 'codename_base': 'supplier'},
+            {'label': 'Producto', 'codename_base': 'product'},
+            {'label': 'Cliente', 'codename_base': 'customer'},
+            {'label': 'Factura', 'codename_base': 'invoice'},
+            {'label': 'Compra', 'codename_base': 'purchase'},
+            {'label': 'Cobro Factura', 'codename_base': 'cobrofactura'},
+            {'label': 'Pago Compra', 'codename_base': 'pagocompra'},
+            {'label': 'Usuario', 'codename_base': 'user'},
+            {'label': 'Sobretiempo', 'codename_base': 'sobretiempo'},
+        ]
+        
+        actions = [
+            {'suffix': 'view', 'label': 'Leer'},
+            {'suffix': 'detail', 'label': 'Detalle'},
+            {'suffix': 'add', 'label': 'Crear'},
+            {'suffix': 'change', 'label': 'Editar'},
+            {'suffix': 'delete', 'label': 'Eliminar'},
+            {'suffix': 'download_pdf', 'label': 'PDF'},
+            {'suffix': 'download_excel', 'label': 'Excel'},
+            {'suffix': 'whatsapp', 'label': 'WhatsApp'},
+        ]
+        
+        context['target_user'] = user
+        context['direct_perms'] = direct_perms
+        context['inherited_perms'] = inherited_perms
+        context['models_config'] = models_config
+        context['actions'] = actions
+        context['db_permissions'] = set(Permission.objects.values_list('codename', flat=True))
+        
+        return context
+
+
+@user_passes_test(is_admin_or_superuser, login_url='/')
+@require_POST
+def update_user_permission(request):
+    try:
+        data = json.loads(request.body)
+        user_id = data.get('user_id')
+        codename = data.get('codename')
+        state = data.get('state')
+        
+        user = User.objects.get(pk=user_id)
+        permission = Permission.objects.get(codename=codename)
+        
+        if state:
+            user.user_permissions.add(permission)
+        else:
+            user.user_permissions.remove(permission)
+            
+        return JsonResponse({'success': True, 'count': user.user_permissions.count()})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 

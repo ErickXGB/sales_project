@@ -1,17 +1,27 @@
 {% extends 'billing/base.html' %}
 {% block title %}Iniciar Sesión{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
-    <div class="card shadow border-0" style="border-radius: 12px;">
-      <div class="card-header bg-dark text-white text-center py-3" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
-        <h4 class="mb-0"><i class="bi bi-box-arrow-in-right me-2"></i>Iniciar Sesión</h4>
+<div class="d-flex align-items-center justify-content-center" style="min-height: 80vh; padding: 1.5rem 0;">
+  <div class="w-100" style="max-width: 480px;">
+    
+    <div class="text-center mb-4">
+      <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle mb-3" style="width: 60px; height: 60px;">
+        <i class="bi bi-box-seam-fill fs-2"></i>
       </div>
-      <div class="card-body p-4">
+      <h3 class="fw-bold text-dark mb-1">VentasManager ERP</h3>
+      <p class="text-muted small">Ingresa tus credenciales para acceder al sistema</p>
+    </div>
+
+    <div class="card shadow-lg border-0">
+      <div class="card-header text-center py-4 border-0" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-top-left-radius: 16px; border-top-right-radius: 16px;">
+        <h4 class="mb-0 text-white fw-bold"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Iniciar Sesión</h4>
+      </div>
+      <div class="card-body p-4 p-md-5">
         {% if form.non_field_errors %}
-        <div class="alert alert-danger shadow-sm alert-dismissible fade show" role="alert">
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm border-0 mb-4" role="alert">
           {% for error in form.non_field_errors %}
-          <div><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}</div>
+          <div class="d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle-fill fs-5"></i> <span>{{ error }}</span></div>
           {% endfor %}
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
@@ -20,21 +30,24 @@
         <form method="post">
           {% csrf_token %}
           {% for field in form %}
-          <div class="mb-3">
-            <label class="form-label fw-bold" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            <input type="{% if field.name == 'password' %}password{% else %}text{% endif %}"
-                   name="{{ field.html_name }}"
-                   id="{{ field.id_for_label }}"
-                   class="form-control {% if field.errors %}is-invalid{% endif %}"
-                   placeholder="{{ field.label }}"
-                   {% if field.value %}value="{{ field.value }}"{% endif %}
-                   required>
+          <div class="mb-4">
+            <label class="form-label text-dark fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="position-relative">
+              <input type="{% if field.name == 'password' %}password{% else %}text{% endif %}"
+                     name="{{ field.html_name }}"
+                     id="{{ field.id_for_label }}"
+                     class="form-control {% if field.errors %}is-invalid{% endif %}"
+                     placeholder="Ingresa tu {% if field.name == 'password' %}contraseña{% else %}nombre de usuario{% endif %}"
+                     {% if field.value %}value="{{ field.value }}"{% endif %}
+                     required>
+            </div>
             {% for error in field.errors %}
-            <div class="invalid-feedback d-block"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
+            <div class="invalid-feedback d-block mt-2"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
             {% endfor %}
           </div>
           {% endfor %}
-          <div class="mb-3 d-flex justify-content-between align-items-center">
+          
+          <div class="mb-4 d-flex justify-content-between align-items-center">
             <div class="form-check">
               <input type="checkbox" name="remember_me" id="remember_me" class="form-check-input">
               <label class="form-check-label text-muted" for="remember_me">Recordar sesión</label>

@@ -104,33 +104,40 @@
         document.getElementById('paypal-button-container').style.display = 'none';
         document.getElementById('loading-spinner').style.display = 'block';
 
-        // Enviar el ID de orden y pagador a nuestro backend
-        return fetch('{% url "billing:invoice_paypal_capture" invoice.pk %}', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-          },
-          body: JSON.stringify({
-            orderID: data.orderID,
-            payerID: data.payerID
+        // Capturar el pago en los servidores de PayPal para que la transacción se complete
+        return actions.order.capture().then(function(orderData) {
+          // Enviar el ID de orden y pagador a nuestro backend para el registro
+          return fetch('{% url "billing:invoice_paypal_capture" invoice.pk %}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+              orderID: data.orderID,
+              payerID: data.payerID
+            })
           })
-        })
-        .then(function(res) {
-          return res.json();
-        })
-        .then(function(details) {
-          if (details.status === 'success') {
-            // Redirigir al detalle con el mensaje de éxito
-            window.location.href = '{% url "billing:invoice_detail" invoice.pk %}';
-          } else {
-            alert('Error al verificar el pago en el servidor: ' + details.message);
+          .then(function(res) {
+            return res.json();
+          })
+          .then(function(details) {
+            if (details.status === 'success') {
+              // Redirigir al detalle con el mensaje de éxito
+              window.location.href = '{% url "billing:invoice_detail" invoice.pk %}';
+            } else {
+              alert('Error al verificar el pago en el servidor: ' + details.message);
+              document.getElementById('paypal-button-container').style.display = 'block';
+              document.getElementById('loading-spinner').style.display = 'none';
+            }
+          })
+          .catch(function(err) {
+            alert('Ocurrió un error al intentar comunicarse con el servidor: ' + err);
             document.getElementById('paypal-button-container').style.display = 'block';
             document.getElementById('loading-spinner').style.display = 'none';
-          }
-        })
-        .catch(function(err) {
-          alert('Ocurrió un error al intentar comunicarse con el servidor: ' + err);
+          });
+        }).catch(function(err) {
+          alert('Se produjo un error al capturar el pago en PayPal: ' + err);
           document.getElementById('paypal-button-container').style.display = 'block';
           document.getElementById('loading-spinner').style.display = 'none';
         });

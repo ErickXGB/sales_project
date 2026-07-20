@@ -17,6 +17,8 @@ urlpatterns = [
     path('users/create/', views.AdminUserCreateView.as_view(), name='user_create'),
     path('users/<int:pk>/edit/', views.UserUpdateView.as_view(), name='user_update'),
     path('users/<int:pk>/delete/', views.UserDeleteView.as_view(), name='user_delete'),
+    path('users/<int:pk>/permissions/', views.UserPermissionsView.as_view(), name='user_permissions'),
+    path('users/update-permission/', views.update_user_permission, name='update_user_permission'),
 
     # Roles (Group)
     path('roles/', views.GroupListView.as_view(), name='group_list'),

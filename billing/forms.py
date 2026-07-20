@@ -3,7 +3,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import Brand, ProductGroup, Supplier, Product, Customer, Invoice, InvoiceDetail
+from .models import Brand, ProductGroup, Supplier, Product, Customer, Invoice, InvoiceDetail, Empresa
 
 class SignUpForm(UserCreationForm):
     email = forms.EmailField(
@@ -227,3 +227,22 @@ InvoiceDetailFormSet = inlineformset_factory(
         'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
     }
 )
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        labels = {
+            'first_name': 'Nombre',
+            'last_name': 'Apellido',
+            'email': 'Correo electrónico',
+        }
+        widgets = {
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Tu nombre'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Tu apellido'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Tu correo electrónico'}),
+        }
+
+
+
+

@@ -140,6 +140,102 @@
   </div>
 </div>
 
+<!-- Modal Emergente de Progreso (Diseño Premium Glassmorphism) -->
+<div class="modal fade glass-modal" id="progressModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow border-0">
+      <div class="modal-header border-0 bg-transparent pt-4 px-4 pb-0">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="progressModalLabel" style="font-size: 1.35rem;">
+          <i class="bi bi-gear-fill spin-icon text-primary"></i>
+          <span>Generando Factura</span>
+        </h5>
+      </div>
+      <div class="modal-body p-4">
+        <!-- Tracker de Pasos -->
+        <div class="progress-steps-tracker">
+          
+          <!-- Paso 1: Base de Datos -->
+          <div class="step-item d-flex align-items-center" id="step-db_save">
+            <div class="step-icon me-3">
+              <i class="bi bi-database-fill"></i>
+            </div>
+            <div class="step-content flex-grow-1">
+              <h6 class="mb-0 fw-semibold text-main">Guardar Factura</h6>
+              <small class="text-muted status-text">Esperando...</small>
+            </div>
+            <div class="step-badge ms-auto">
+              <span class="spinner-border spinner-border-sm text-primary d-none" role="status"></span>
+              <i class="bi bi-check-circle-fill text-success fs-4 d-none"></i>
+              <i class="bi bi-exclamation-triangle-fill text-danger fs-4 d-none"></i>
+            </div>
+          </div>
+          
+          <!-- Paso 2: Envío de Correo -->
+          <div class="step-item d-flex align-items-center" id="step-email_send">
+            <div class="step-icon me-3">
+              <i class="bi bi-envelope-fill"></i>
+            </div>
+            <div class="step-content flex-grow-1">
+              <h6 class="mb-0 fw-semibold text-main">Enviar por Correo</h6>
+              <small class="text-muted status-text">Esperando...</small>
+            </div>
+            <div class="step-badge ms-auto">
+              <span class="spinner-border spinner-border-sm text-primary d-none" role="status"></span>
+              <i class="bi bi-check-circle-fill text-success fs-4 d-none"></i>
+              <i class="bi bi-exclamation-triangle-fill text-warning fs-4 d-none"></i>
+              <i class="bi bi-slash-circle text-muted fs-4 d-none" title="Omitido"></i>
+            </div>
+          </div>
+
+          <!-- Paso 3: Autorización SRI -->
+          <div class="step-item d-flex align-items-center" id="step-sri_auth">
+            <div class="step-icon me-3">
+              <i class="bi bi-bank2"></i>
+            </div>
+            <div class="step-content flex-grow-1">
+              <h6 class="mb-0 fw-semibold text-main">Autorización SRI (Ecuador)</h6>
+              <small class="text-muted status-text">Esperando...</small>
+            </div>
+            <div class="step-badge ms-auto">
+              <span class="spinner-border spinner-border-sm text-primary d-none" role="status"></span>
+              <i class="bi bi-check-circle-fill text-success fs-4 d-none"></i>
+              <i class="bi bi-exclamation-triangle-fill text-danger fs-4 d-none"></i>
+              <i class="bi bi-exclamation-triangle-fill text-warning fs-4 d-none"></i>
+            </div>
+          </div>
+
+          <!-- Paso 4: Finalización -->
+          <div class="step-item d-flex align-items-center" id="step-finish">
+            <div class="step-icon me-3">
+              <i class="bi bi-check-all"></i>
+            </div>
+            <div class="step-content flex-grow-1">
+              <h6 class="mb-0 fw-semibold text-main">Finalizando Proceso</h6>
+              <small class="text-muted status-text">Esperando...</small>
+            </div>
+            <div class="step-badge ms-auto">
+              <span class="spinner-border spinner-border-sm text-primary d-none" role="status"></span>
+              <i class="bi bi-check-circle-fill text-success fs-4 d-none"></i>
+            </div>
+          </div>
+
+        </div>
+        
+        <!-- Contenedor de Errores de Validación -->
+        <div class="alert alert-danger mt-3 d-none" id="error-container" role="alert">
+          <h6 class="alert-heading fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-1"></i> Errores de Validación:</h6>
+          <ul class="mb-0 ps-3" id="error-list" style="font-size: 0.9rem;">
+          </ul>
+        </div>
+      </div>
+      
+      <div class="modal-footer border-0 bg-transparent justify-content-end pt-0 px-4 pb-4 d-none" id="modal-footer-actions">
+        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal" id="btn-close-modal" style="border-radius: 0.5rem;">Cerrar y corregir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Datos JSON para JavaScript -->
 <script id="customers-data" type="application/json">
   {{ customers_json_str|safe }}
@@ -336,12 +432,92 @@
     const taxpayerContainer = document.getElementById('taxpayer-type-container');
     const paymentTermsSelect = document.querySelector('#customer_payment_terms');
     
-    // Habilitar campos deshabilitados al enviar el formulario para que se posteen los datos
+    // Interceptar submit para el flujo de guardado con progreso en tiempo real
     const form = document.querySelector('#invoice-form');
     if (form) {
-      form.addEventListener('submit', function() {
+      form.addEventListener('submit', async function(e) {
+        // Habilitar campos deshabilitados temporalmente para que FormData capture su valor
         if (paymentTermsSelect) {
           paymentTermsSelect.disabled = false;
+        }
+        
+        // Validación nativa del navegador
+        if (!form.checkValidity()) {
+          return;
+        }
+        
+        e.preventDefault();
+        
+        const progressModalElement = document.getElementById('progressModal');
+        const progressModal = new bootstrap.Modal(progressModalElement, {
+          backdrop: 'static',
+          keyboard: false
+        });
+        
+        // Inicializar y mostrar el modal
+        resetProgressModal();
+        progressModal.show();
+        
+        const formData = new FormData(form);
+        const url = form.getAttribute('action') || window.location.href;
+        
+        // URL con parámetro de activación de streaming
+        const streamUrl = new URL(url, window.location.origin);
+        streamUrl.searchParams.set('stream', '1');
+        
+        try {
+          const response = await fetch(streamUrl.toString(), {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          
+          if (!response.body) {
+            throw new Error("El navegador no soporta streaming de respuestas.");
+          }
+          
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            
+            // Conservar el fragmento incompleto en el buffer
+            buffer = lines.pop();
+            
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed) {
+                try {
+                  const data = JSON.parse(trimmed);
+                  handleStreamStep(data);
+                } catch (parseErr) {
+                  console.error("Error parseando línea del stream:", trimmed, parseErr);
+                }
+              }
+            }
+          }
+          
+          // Procesar remanente
+          if (buffer.trim()) {
+            try {
+              const data = JSON.parse(buffer.trim());
+              handleStreamStep(data);
+            } catch (e) {
+              console.error("Error parseando remanente del stream:", buffer, e);
+            }
+          }
+          
+        } catch (err) {
+          console.error("Error de red/conexión:", err);
+          showValidationError(["No se pudo conectar con el servidor. Por favor, intente nuevamente."]);
         }
       });
     }
@@ -389,5 +565,127 @@
       addProductRow();
     }
   });
+
+  // Funciones de utilidad para el modal de progreso
+  function resetProgressModal() {
+    document.getElementById('modal-footer-actions').classList.add('d-none');
+    document.getElementById('error-container').classList.add('d-none');
+    document.getElementById('error-list').innerHTML = '';
+    
+    const steps = ['db_save', 'email_send', 'sri_auth', 'finish'];
+    steps.forEach(stepId => {
+      const stepItem = document.getElementById(`step-${stepId}`);
+      stepItem.className = 'step-item d-flex align-items-center'; // Reset active/success/error/warning
+      
+      const statusText = stepItem.querySelector('.status-text');
+      statusText.textContent = 'Esperando...';
+      
+      stepItem.querySelector('.spinner-border').classList.add('d-none');
+      stepItem.querySelector('.bi-check-circle-fill').classList.add('d-none');
+      
+      // Ocultar íconos específicos
+      const dangerIcon = stepItem.querySelector('.bi-exclamation-triangle-fill');
+      if (dangerIcon) dangerIcon.classList.add('d-none');
+      
+      if (stepId === 'email_send') {
+        stepItem.querySelector('.bi-slash-circle').classList.add('d-none');
+      }
+    });
+  }
+
+  function handleStreamStep(data) {
+    const step = data.step;
+    const status = data.status;
+    const message = data.message;
+    
+    if (step === 'validation' && status === 'error') {
+      showValidationError(data.errors || [message]);
+      return;
+    }
+    
+    const stepItem = document.getElementById(`step-${step}`);
+    if (!stepItem) return;
+    
+    const statusText = stepItem.querySelector('.status-text');
+    const spinner = stepItem.querySelector('.spinner-border');
+    const checkIcon = stepItem.querySelector('.bi-check-circle-fill');
+    
+    if (status === 'running') {
+      stepItem.className = 'step-item d-flex align-items-center active';
+      statusText.textContent = message;
+      spinner.classList.remove('d-none');
+      checkIcon.classList.add('d-none');
+    } 
+    else if (status === 'success') {
+      stepItem.className = 'step-item d-flex align-items-center success';
+      statusText.textContent = message;
+      spinner.classList.add('d-none');
+      checkIcon.classList.remove('d-none');
+    }
+    else if (status === 'warning') {
+      stepItem.className = 'step-item d-flex align-items-center warning';
+      statusText.textContent = message;
+      spinner.classList.add('d-none');
+      
+      const warningIcon = stepItem.querySelector('.bi-exclamation-triangle-fill');
+      if (warningIcon) {
+        warningIcon.className = "bi bi-exclamation-triangle-fill text-warning fs-4";
+        warningIcon.classList.remove('d-none');
+      }
+    }
+    else if (status === 'error') {
+      stepItem.className = 'step-item d-flex align-items-center error';
+      statusText.textContent = message;
+      spinner.classList.add('d-none');
+      
+      const errorIcon = stepItem.querySelector('.bi-exclamation-triangle-fill');
+      if (errorIcon) {
+        errorIcon.className = "bi bi-exclamation-triangle-fill text-danger fs-4";
+        errorIcon.classList.remove('d-none');
+      }
+      
+      document.getElementById('modal-footer-actions').classList.remove('d-none');
+    }
+    else if (status === 'skipped') {
+      stepItem.className = 'step-item d-flex align-items-center';
+      statusText.textContent = message;
+      spinner.classList.add('d-none');
+      
+      const skippedIcon = stepItem.querySelector('.bi-slash-circle');
+      if (skippedIcon) skippedIcon.classList.remove('d-none');
+    }
+    
+    if (step === 'finish' && status === 'success') {
+      setTimeout(() => {
+        window.location.href = data.redirect_url;
+      }, 1500);
+    }
+  }
+
+  function showValidationError(errors) {
+    const errorContainer = document.getElementById('error-container');
+    const errorList = document.getElementById('error-list');
+    errorList.innerHTML = '';
+    
+    errors.forEach(err => {
+      const li = document.createElement('li');
+      li.textContent = err;
+      errorList.appendChild(li);
+    });
+    
+    errorContainer.classList.remove('d-none');
+    document.getElementById('modal-footer-actions').classList.remove('d-none');
+    
+    const clientSelect = document.querySelector('#customer_select');
+    const customersData = JSON.parse(document.getElementById('customers-data').textContent);
+    const clientSelectVal = clientSelect.value;
+    const paymentTermsSelect = document.querySelector('#customer_payment_terms');
+    if (clientSelectVal !== '' && clientSelectVal !== 'new') {
+      const client = customersData.find(c => c.id == clientSelectVal);
+      if (client && client.dni === '9999999999' && paymentTermsSelect) {
+        paymentTermsSelect.disabled = true;
+      }
+    }
+  }
 </script>
 {% endblock %}

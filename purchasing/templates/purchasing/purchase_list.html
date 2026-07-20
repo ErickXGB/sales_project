@@ -3,30 +3,48 @@
 {% block content %}
 <h2>Compras (Adquisiciones)</h2>
 
-<!-- Buscador por campos (Compacto) -->
-<form method="get" class="mb-4">
-  <div class="input-group shadow-sm" style="max-width: 700px;">
-    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
-    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
-      <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
-      <option value="supplier" {% if search_field == 'supplier' %}selected{% endif %}>Proveedor</option>
-      <option value="document" {% if search_field == 'document' %}selected{% endif %}>Nº Documento</option>
-      <option value="date" {% if search_field == 'date' %}selected{% endif %}>Fecha (AAAA-MM-DD)</option>
-      <option value="total" {% if search_field == 'total' %}selected{% endif %}>Total ($)</option>
-      <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
-    </select>
-    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
-      placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
-    <button type="submit" class="btn btn-primary">Buscar</button>
-    <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-outline-secondary">Limpiar</a>
-  </div>
-</form>
+<!-- Buscador y Acciones (Alineados) -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <form method="get" class="m-0 flex-grow-1" style="max-width: 700px;">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+      <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+        <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
+        <option value="supplier" {% if search_field == 'supplier' %}selected{% endif %}>Proveedor</option>
+        <option value="document" {% if search_field == 'document' %}selected{% endif %}>Nº Documento</option>
+        <option value="date" {% if search_field == 'date' %}selected{% endif %}>Fecha (AAAA-MM-DD)</option>
+        <option value="total" {% if search_field == 'total' %}selected{% endif %}>Total ($)</option>
+        <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
+      </select>
+      <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle"
+        placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
+      <button type="submit" class="btn btn-primary">Buscar</button>
+      <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-outline-secondary">Limpiar</a>
+    </div>
+  </form>
 
-<div class="mb-3 d-flex gap-2">
-  <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-success">+ Nueva Compra</a>
-  <a href="{% url 'purchasing:purchase_report' %}" class="btn btn-outline-primary">Ver Reporte de Costos</a>
-  <a href="{% url 'purchasing:purchase_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
-  <a href="{% url 'purchasing:purchase_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
+  <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+    {% if perms.purchasing.view_purchase %}
+    <a href="{% url 'purchasing:purchase_report' %}" class="btn btn-outline-primary d-flex align-items-center gap-2 fw-semibold" style="border-radius: 0.5rem; padding: 0.4rem 1rem;">
+      <i class="bi bi-file-earmark-bar-graph"></i> Reporte
+    </a>
+    {% endif %}
+    {% if perms.purchasing.download_purchase_pdf %}
+    <a href="{% url 'purchasing:purchase_report_pdf' %}" class="btn btn-action-pdf d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-file-earmark-pdf-fill"></i> PDF
+    </a>
+    {% endif %}
+    {% if perms.purchasing.download_purchase_excel %}
+    <a href="{% url 'purchasing:purchase_report_excel' %}" class="btn btn-action-excel d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-file-earmark-excel-fill"></i> Excel
+    </a>
+    {% endif %}
+    {% if perms.purchasing.add_purchase %}
+    <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-action-add d-flex align-items-center gap-2 fw-semibold">
+      + Compra
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 
@@ -56,9 +74,15 @@
           <td class="text-end">${{ pur.tax }}</td>
           <td class="text-end fw-bold">${{ pur.total }}</td>
           <td class="text-center">
+            {% if perms.purchasing.detail_purchase %}
             <a href="{% url 'purchasing:purchase_detail' pur.pk %}" class="btn btn-sm btn-info text-white">Ver</a>
+            {% endif %}
+            {% if perms.purchasing.download_purchase_pdf %}
             <a href="{% url 'purchasing:purchase_pdf' pur.pk %}" class="btn btn-sm btn-primary" title="Imprimir PDF"><i class="bi bi-printer"></i></a>
+            {% endif %}
+            {% if perms.purchasing.delete_purchase %}
             <a href="{% url 'purchasing:purchase_delete' pur.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+            {% endif %}
           </td>
         </tr>
         {% empty %}

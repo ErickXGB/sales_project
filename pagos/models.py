@@ -25,6 +25,12 @@ class CobroFactura(models.Model):
         verbose_name = 'Cobro de Factura'
         verbose_name_plural = 'Cobros de Facturas'
         ordering = ['-fecha', '-id']
+        permissions = [
+            ("download_cobrofactura_pdf", "Can download CobroFactura PDF report"),
+            ("download_cobrofactura_excel", "Can download CobroFactura Excel report"),
+            ("detail_cobrofactura", "Can view CobroFactura details"),
+            ("whatsapp_cobrofactura", "Can send CobroFactura via WhatsApp"),
+        ]
 
     def __str__(self):
         return f"Abono #{self.id} - {self.factura.numero or f'FAC-{self.factura.id:06d}'} - ${self.valor}"
@@ -131,6 +137,12 @@ class PagoCompra(models.Model):
         verbose_name = 'Pago de Compra'
         verbose_name_plural = 'Pagos de Compras'
         ordering = ['-fecha', '-id']
+        permissions = [
+            ("download_pagocompra_pdf", "Can download PagoCompra PDF report"),
+            ("download_pagocompra_excel", "Can download PagoCompra Excel report"),
+            ("detail_pagocompra", "Can view PagoCompra details"),
+            ("whatsapp_pagocompra", "Can send PagoCompra via WhatsApp"),
+        ]
 
     def __str__(self):
         return f"Pago #{self.id} - Compra {self.compra.document_number} - ${self.valor}"

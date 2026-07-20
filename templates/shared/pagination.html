@@ -1,0 +1,62 @@
+{% if is_paginated %}
+<div class="d-flex justify-content-between align-items-center my-4">
+    <!-- Controles de paginación izquierda -->
+    <div>
+        <nav aria-label="Navegación de páginas">
+            <ul class="pagination mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Primera">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Anterior">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">&laquo;&laquo;</span></li>
+                <li class="page-item disabled"><span class="page-link">&laquo;</span></li>
+                {% endif %}
+                
+                <li class="page-item active">
+                    <span class="page-link">
+                        Página {{ page_obj.number }} de {{ paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Siguiente">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Última">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">&raquo;</span></li>
+                <li class="page-item disabled"><span class="page-link">&raquo;&raquo;</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    
+    <!-- Menú desplegable a la derecha para seleccionar página directamente -->
+    <div>
+        <div class="input-group">
+            <label class="input-group-text bg-light text-secondary border-secondary-subtle" style="border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important;" for="page-select"><i class="bi bi-list-ol me-1"></i>Ir a:</label>
+            <select class="form-select border-secondary-subtle" style="border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important;" id="page-select" onchange="window.location.href=this.value;">
+                {% for page_num in paginator.page_range %}
+                <option value="?page={{ page_num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" {% if page_num == page_obj.number %}selected{% endif %}>
+                    Página {{ page_num }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+{% endif %}

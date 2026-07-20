@@ -1,10 +1,11 @@
 import re
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import StreamingHttpResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.contrib.auth import login
 from django.views import View
 from django.db import transaction
@@ -143,7 +144,7 @@ def home(request):
             'total_suppliers': Supplier.objects.filter(is_active=True).count(),
         })
 
-    if is_ventas:
+    if is_ventas or is_admin or is_gerente:
         context.update({
             'total_customers': Customer.objects.filter(is_active=True).count(),
             'total_invoices_sales': Invoice.objects.filter(is_active=True).count(),
@@ -151,7 +152,7 @@ def home(request):
             'pending_cobros': Invoice.objects.filter(tipo_pago='CREDITO', estado='PENDIENTE', is_active=True).select_related('customer').order_by('-invoice_date')[:5],
         })
 
-    if is_compras:
+    if is_compras or is_admin or is_gerente:
         context.update({
             'low_stock': Product.objects.filter(stock__lte=5, is_active=True).select_related('brand'),
             'total_suppliers': Supplier.objects.filter(is_active=True).count(),
@@ -193,8 +194,17 @@ def brand_list(request):
                 q_filters |= Q(is_active=False)
             brands = brands.filter(q_filters)
             
+    # Paginación de hasta 10 marcas
+    from django.core.paginator import Paginator
+    paginator = Paginator(brands, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     return render(request, 'billing/brand_list.html', {
-        'brands': brands,
+        'brands': page_obj,
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'is_paginated': page_obj.has_other_pages(),
         'search_field': search_field,
         'search_value': search_value
     })
@@ -318,6 +328,7 @@ class ProductGroupListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
     model = ProductGroup
     template_name = 'billing/productgroup_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -369,6 +380,7 @@ class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Supplier
     template_name = 'billing/supplier_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -428,6 +440,7 @@ class ProductListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Product
     template_name = 'billing/product_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related('brand', 'group').prefetch_related('suppliers')
@@ -509,6 +522,7 @@ class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Customer
     template_name = 'billing/customer_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -570,6 +584,7 @@ class InvoiceListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = Invoice
     template_name = 'billing/invoice_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -625,6 +640,25 @@ class InvoiceListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     permission_required = 'billing.add_invoice'
     def get(self, request, *args, **kwargs):
+        empresa = request.user.empresas.filter(is_active=True).first()
+        if not empresa:
+            empresa, _ = Empresa.objects.get_or_create(
+                ruc="1756927560001",
+                defaults={
+                    'razon_social': 'Empresa Demo S.A.',
+                    'nombre_comercial': 'Empresa Demo',
+                    'dir_matriz': 'Quito, Ecuador',
+                    'dir_establecimiento': 'Quito, Ecuador',
+                    'obligado_contabilidad': False,
+                    'codigo_establecimiento': '001',
+                    'codigo_punto_emision': '001',
+                    'secuencial_factura': 1,
+                    'ambiente': '1',
+                    'is_active': True
+                }
+            )
+            empresa.usuarios.add(request.user)
+
         # Asegurar que Consumidor Final existe
         cf_obj, created = Customer.objects.get_or_create(
             dni="9999999999",
@@ -686,6 +720,7 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return render(request, 'billing/invoice_form.html', context)
         
     def post(self, request, *args, **kwargs):
+        empresa = request.user.empresas.filter(is_active=True).first() or Empresa.objects.filter(is_active=True).first()
         customer_id = request.POST.get('customer_select', '').strip()
         customer_dni = request.POST.get('customer_dni', '').strip()
         customer_first_name = request.POST.get('customer_first_name', '').strip()
@@ -794,10 +829,304 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
             })
             
         if errors:
-            for err in errors:
-                messages.error(request, err)
-            return self._render_form_with_errors(request)
+            if request.GET.get('stream') == '1':
+                def error_generator():
+                    yield json.dumps({"step": "validation", "status": "error", "errors": errors}) + "\n"
+                return StreamingHttpResponse(error_generator(), content_type='application/x-ndjson')
+            else:
+                for err in errors:
+                    messages.error(request, err)
+                return self._render_form_with_errors(request)
             
+        if request.GET.get('stream') == '1':
+            def stream_generator():
+                nonlocal subtotal, customer_id, customer_dni, customer_first_name, customer_last_name
+                nonlocal customer_email, customer_phone, customer_address, customer_taxpayer_type
+                nonlocal customer_payment_terms, items_to_save, request
+                
+                local_customer = None
+                local_invoice = None
+                
+                # Paso 1: Guardar Factura en Base de Datos
+                yield json.dumps({"step": "db_save", "status": "running", "message": "Guardando factura en base de datos..."}) + "\n"
+                try:
+                    with transaction.atomic():
+                        if customer_id and customer_id != 'new':
+                            local_customer = Customer.objects.get(id=customer_id)
+                            local_customer.first_name = customer_first_name
+                            local_customer.last_name = customer_last_name
+                            local_customer.email = customer_email
+                            local_customer.phone = customer_phone
+                            local_customer.address = customer_address
+                            local_customer.save()
+                        else:
+                            local_customer = Customer.objects.filter(dni=customer_dni).first()
+                            if local_customer:
+                                local_customer.first_name = customer_first_name
+                                local_customer.last_name = customer_last_name
+                                local_customer.email = customer_email
+                                local_customer.phone = customer_phone
+                                local_customer.address = customer_address
+                                local_customer.save()
+                            else:
+                                local_customer = Customer.objects.create(
+                                    dni=customer_dni,
+                                    first_name=customer_first_name,
+                                    last_name=customer_last_name,
+                                    email=customer_email,
+                                    phone=customer_phone,
+                                    address=customer_address
+                                )
+                        
+                        profile, created = CustomerProfile.objects.get_or_create(customer=local_customer)
+                        profile.taxpayer_type = customer_taxpayer_type
+                        profile.payment_terms = customer_payment_terms
+                        profile.save()
+                        
+                        tax = subtotal * Decimal('0.15')
+                        total = subtotal + tax
+                        
+                        if customer_payment_terms == 'paypal':
+                            metodo_pago = 'PAYPAL'
+                            tipo_pago = 'CONTADO'
+                            saldo = total
+                            estado = 'PENDIENTE'
+                        elif customer_payment_terms in ['credit', 'credit_15', 'credit_30', 'credit_60'] or customer_payment_terms.startswith('credit'):
+                            metodo_pago = 'CREDITO'
+                            tipo_pago = 'CREDITO'
+                            saldo = total
+                            estado = 'PENDIENTE'
+                        else:
+                            metodo_pago = 'EFECTIVO'
+                            tipo_pago = 'CONTADO'
+                            saldo = Decimal('0.00')
+                            estado = 'PAGADA'
+
+                        secuencial_factura_generada = str(empresa.secuencial_factura).zfill(9)
+                        empresa.secuencial_factura += 1
+                        empresa.save(update_fields=['secuencial_factura'])
+
+                        local_invoice = Invoice.objects.create(
+                            empresa=empresa,
+                            customer=local_customer,
+                            subtotal=subtotal,
+                            tax=tax,
+                            total=total,
+                            is_active=True,
+                            tipo_pago=tipo_pago,
+                            metodo_pago=metodo_pago,
+                            saldo=saldo,
+                            estado=estado,
+                            numero=f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{secuencial_factura_generada}"
+                        )
+                        
+                        for item in items_to_save:
+                            InvoiceDetail.objects.create(
+                                invoice=local_invoice,
+                                product=item['product'],
+                                quantity=item['quantity'],
+                                unit_price=item['unit_price'],
+                                subtotal=item['subtotal']
+                            )
+                            item['product'].stock -= item['quantity']
+                            item['product'].save()
+                    
+                    messages.success(request, f"Factura #{local_invoice.id} guardada con éxito.")
+                    yield json.dumps({
+                        "step": "db_save", 
+                        "status": "success", 
+                        "message": f"Factura #{local_invoice.id} guardada con éxito."
+                    }) + "\n"
+                except Exception as e:
+                    yield json.dumps({"step": "db_save", "status": "error", "message": f"Error al guardar la factura: {str(e)}"}) + "\n"
+                    return
+
+                # Paso 2: Enviar por Correo Electrónico
+                if local_customer.email:
+                    yield json.dumps({
+                        "step": "email_send", 
+                        "status": "running", 
+                        "message": f"Enviando correo a {local_customer.email}..."
+                    }) + "\n"
+                    try:
+                        from django.core.mail import EmailMessage
+                        pdf_data = generate_invoice_pdf_data(local_invoice)
+                        email = EmailMessage(
+                            subject=f'Factura #{local_invoice.id} - Sistema de Ventas',
+                            body=(
+                                f'Hola {local_customer.full_name},\n\n'
+                                f'Se ha generado la factura #{local_invoice.id} de su compra realizada el {local_invoice.invoice_date.strftime("%d/%m/%Y")}.\n'
+                                f'Adjunto a este correo encontrará el documento PDF con el detalle correspondiente.\n\n'
+                                f'Detalles de facturación:\n'
+                                f'- Subtotal: ${local_invoice.subtotal}\n'
+                                f'- IVA (15%): ${local_invoice.tax}\n'
+                                f'- Total Facturado: ${local_invoice.total}\n\n'
+                                f'Agradecemos su preferencia.\n'
+                                f'Atentamente,\nEl equipo de Ventas'
+                            ),
+                            from_email=None,
+                            to=[local_customer.email]
+                        )
+                        email.attach(f'Factura_{local_invoice.id}.pdf', pdf_data, 'application/pdf')
+                        email.send(fail_silently=False)
+                        messages.success(request, f"Factura enviada automáticamente al correo: {local_customer.email}")
+                        yield json.dumps({
+                            "step": "email_send", 
+                            "status": "success", 
+                            "message": f"Factura enviada automáticamente al correo: {local_customer.email}"
+                        }) + "\n"
+                    except Exception as mail_err:
+                        messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {str(mail_err)}")
+                        yield json.dumps({
+                            "step": "email_send", 
+                            "status": "warning", 
+                            "message": f"Fallo al enviar correo: {str(mail_err)}"
+                        }) + "\n"
+                else:
+                    yield json.dumps({
+                        "step": "email_send", 
+                        "status": "skipped", 
+                        "message": "Sin correo registrado para enviar."
+                    }) + "\n"
+
+                # Paso 3: Autorización del SRI (Ecuador)
+                yield json.dumps({
+                    "step": "sri_auth", 
+                    "status": "running", 
+                    "message": "Enviando comprobante electrónico al SRI..."
+                }) + "\n"
+                try:
+                    import requests
+                    import base64
+                    import os
+                    from django.conf import settings
+                    
+                    detalles_sri = []
+                    for d in local_invoice.details.all():
+                        detalles_sri.append({
+                            "codigo": str(d.product.id),
+                            "descripcion": d.product.name,
+                            "cantidad": float(d.quantity),
+                            "precio_unitario": float(d.unit_price),
+                            "descuento": 0.0,
+                            "precio_total": float(d.subtotal)
+                        })
+                    
+                    dni = local_customer.dni
+                    if dni in ("9999999999", "9999999999999"):
+                        tipo_id = "07"
+                    elif len(dni) == 13:
+                        tipo_id = "04"
+                    else:
+                        tipo_id = "05"
+                    
+                    from django.utils import timezone
+                    fecha_local = timezone.localtime(local_invoice.invoice_date).strftime("%d%m%Y")
+                    
+                    payload = {
+                        "datos": {
+                            "ambiente": empresa.ambiente,
+                            "ruc_emisor": empresa.ruc,
+                            "razon_social": empresa.razon_social,
+                            "nombre_comercial": empresa.nombre_comercial,
+                            "dir_matriz": empresa.dir_matriz,
+                            "obligado_contabilidad": "SI" if empresa.obligado_contabilidad else "NO",
+                            "serie": f"{empresa.codigo_establecimiento}{empresa.codigo_punto_emision}",
+                            "secuencial": secuencial_factura_generada,
+                            "fecha_emision": fecha_local,
+                            "subtotal": float(local_invoice.subtotal),
+                            "iva": float(local_invoice.tax),
+                            "total": float(local_invoice.total),
+                            "metodo_pago": local_invoice.metodo_pago,
+                            "detalles": detalles_sri,
+                            "cliente": {
+                                "razon_social": local_customer.full_name,
+                                "identificacion": dni,
+                                "tipo_identificacion": tipo_id,
+                                "email": local_customer.email,
+                                "direccion": local_customer.address or empresa.dir_matriz
+                            }
+                        }
+                    }
+                    
+                    response = requests.post(settings.SRI_MICROSERVICE_URL, json=payload, timeout=20)
+                    if response.status_code == 200:
+                        res_data = response.json()
+                        clave = res_data.get("clave_acceso")
+                        sec_sri = res_data.get("secuencial")
+                        success = res_data.get("success")
+                        
+                        if clave:
+                            local_invoice.clave_acceso = clave
+                        if sec_sri:
+                            local_invoice.numero = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
+                        
+                        if success:
+                            local_invoice.estado_sri = 'AUTORIZADO'
+                            messages.success(request, f"Comprobante Autorizado por el SRI. Clave de Acceso: {clave}")
+                            yield json.dumps({
+                                "step": "sri_auth", 
+                                "status": "success", 
+                                "message": f"Comprobante Autorizado por el SRI. Clave de Acceso: {clave}"
+                            }) + "\n"
+                        else:
+                            local_invoice.estado_sri = 'RECHAZADO'
+                            err_msg = res_data.get("error", "Error devuelto por el SRI.")
+                            messages.error(request, f"El SRI no autorizó la factura: {err_msg}")
+                            
+                            detalles = res_data.get("detalles") or []
+                            errors_list = []
+                            for d in detalles:
+                                msg_info = f"- [{d.get('identificador', '')}] {d.get('mensaje', '')}"
+                                if d.get('informacion_adicional'):
+                                    msg_info += f" ({d.get('informacion_adicional')})"
+                                messages.error(request, msg_info)
+                                errors_list.append(msg_info)
+                                
+                            yield json.dumps({
+                                "step": "sri_auth", 
+                                "status": "warning", 
+                                "message": f"El SRI no autorizó la factura: {err_msg}",
+                                "errors": errors_list
+                            }) + "\n"
+                        
+                        local_invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                    else:
+                        try:
+                            err_detail = response.json().get("detail", "Error interno en el microservicio.")
+                        except Exception:
+                            err_detail = "Error interno en el microservicio."
+                        messages.error(request, f"Error del microservicio del SRI (HTTP {response.status_code}): {err_detail}")
+                        yield json.dumps({
+                            "step": "sri_auth", 
+                            "status": "warning", 
+                            "message": f"Error del microservicio del SRI: {err_detail}"
+                        }) + "\n"
+                except Exception as sri_err:
+                    messages.warning(request, f"La factura se guardó, pero falló el envío al SRI: {str(sri_err)}")
+                    yield json.dumps({
+                        "step": "sri_auth", 
+                        "status": "warning", 
+                        "message": f"La factura se guardó, pero falló el envío al SRI: {str(sri_err)}"
+                    }) + "\n"
+
+                # Paso 4: Finalizado
+                redirect_url = reverse('billing:invoice_list')
+                if local_invoice.metodo_pago == 'PAYPAL':
+                    redirect_url = reverse('billing:invoice_paypal_checkout', kwargs={'pk': local_invoice.pk})
+                
+                yield json.dumps({
+                    "step": "finish", 
+                    "status": "success", 
+                    "message": "Factura generada y procesada exitosamente.", 
+                    "redirect_url": redirect_url
+                }) + "\n"
+
+            response = StreamingHttpResponse(stream_generator(), content_type='application/x-ndjson')
+            response['X-Accel-Buffering'] = 'no'
+            return response
+
+        # Comportamiento síncrono original (Fallback/Mantenimiento)
         try:
             with transaction.atomic():
                 if customer_id and customer_id != 'new':
@@ -851,7 +1180,12 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     saldo = Decimal('0.00')
                     estado = 'PAGADA'
 
+                secuencial_factura_generada = str(empresa.secuencial_factura).zfill(9)
+                empresa.secuencial_factura += 1
+                empresa.save(update_fields=['secuencial_factura'])
+
                 invoice = Invoice.objects.create(
+                    empresa=empresa,
                     customer=customer,
                     subtotal=subtotal,
                     tax=tax,
@@ -860,7 +1194,8 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     tipo_pago=tipo_pago,
                     metodo_pago=metodo_pago,
                     saldo=saldo,
-                    estado=estado
+                    estado=estado,
+                    numero=f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{secuencial_factura_generada}"
                 )
                 
                 for item in items_to_save:
@@ -901,6 +1236,99 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                 except Exception as mail_err:
                     messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {str(mail_err)}")
 
+            # Enviar factura al Microservicio del SRI (Facturación Electrónica Ecuador)
+            try:
+                import requests
+                import base64
+                import os
+                from django.conf import settings
+                
+                detalles_sri = []
+                for d in invoice.details.all():
+                    detalles_sri.append({
+                        "codigo": str(d.product.id),
+                        "descripcion": d.product.name,
+                        "cantidad": float(d.quantity),
+                        "precio_unitario": float(d.unit_price),
+                        "descuento": 0.0,
+                        "precio_total": float(d.subtotal)
+                    })
+                
+                dni = customer.dni
+                if dni in ("9999999999", "9999999999999"):
+                    tipo_id = "07"
+                elif len(dni) == 13:
+                    tipo_id = "04"
+                else:
+                    tipo_id = "05"
+                
+                from django.utils import timezone
+                fecha_local = timezone.localtime(invoice.invoice_date).strftime("%d%m%Y")
+                
+                payload = {
+                    "datos": {
+                        "ambiente": empresa.ambiente,
+                        "ruc_emisor": empresa.ruc,
+                        "razon_social": empresa.razon_social,
+                        "nombre_comercial": empresa.nombre_comercial,
+                        "dir_matriz": empresa.dir_matriz,
+                        "obligado_contabilidad": "SI" if empresa.obligado_contabilidad else "NO",
+                        "serie": f"{empresa.codigo_establecimiento}{empresa.codigo_punto_emision}",
+                        "secuencial": secuencial_factura_generada,
+                        "fecha_emision": fecha_local,
+                        "subtotal": float(invoice.subtotal),
+                        "iva": float(invoice.tax),
+                        "total": float(invoice.total),
+                        "metodo_pago": invoice.metodo_pago,
+                        "detalles": detalles_sri,
+                        "cliente": {
+                            "razon_social": customer.full_name,
+                            "identificacion": dni,
+                            "tipo_identificacion": tipo_id,
+                            "email": customer.email,
+                            "direccion": customer.address or empresa.dir_matriz
+                        }
+                    }
+                }
+                
+                # Consumir el microservicio
+                response = requests.post(settings.SRI_MICROSERVICE_URL, json=payload, timeout=20)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    clave = res_data.get("clave_acceso")
+                    sec_sri = res_data.get("secuencial")
+                    success = res_data.get("success")
+                    
+                    if clave:
+                        invoice.clave_acceso = clave
+                    if sec_sri:
+                        invoice.numero = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
+                    
+                    if success:
+                        invoice.estado_sri = 'AUTORIZADO'
+                        messages.success(request, f"Comprobante Autorizado por el SRI. Clave de Acceso: {clave}")
+                    else:
+                        invoice.estado_sri = 'RECHAZADO'
+                        err_msg = res_data.get("error", "Error devuelto por el SRI.")
+                        messages.error(request, f"El SRI no autorizó la factura: {err_msg}")
+                        
+                        detalles = res_data.get("detalles") or []
+                        for d in detalles:
+                            msg_info = f"- [{d.get('identificador', '')}] {d.get('mensaje', '')}"
+                            if d.get('informacion_adicional'):
+                                msg_info += f" ({d.get('informacion_adicional')})"
+                            messages.error(request, msg_info)
+                    
+                    invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                else:
+                    try:
+                        err_detail = response.json().get("detail", "Error interno en el microservicio.")
+                    except Exception:
+                        err_detail = "Error interno en el microservicio."
+                    messages.error(request, f"Error del microservicio del SRI (HTTP {response.status_code}): {err_detail}")
+            except Exception as sri_err:
+                messages.warning(request, f"La factura se guardó, pero falló el envío al SRI: {str(sri_err)}")
+
             messages.success(request, f"Factura #{invoice.id} guardada con éxito.")
             if invoice.metodo_pago == 'PAYPAL':
                 return redirect('billing:invoice_paypal_checkout', pk=invoice.pk)
@@ -909,7 +1337,6 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
         except Exception as e:
             messages.error(request, f"Error al guardar la factura: {str(e)}")
             return self._render_form_with_errors(request)
-
     def _render_form_with_errors(self, request):
         customers = Customer.objects.filter(is_active=True).select_related('profile')
         products = Product.objects.filter(is_active=True).select_related('brand', 'group')
@@ -990,6 +1417,30 @@ class InvoiceDeleteView(LoginRequiredMixin, PermissionRequiredMixin, StaffRequir
     template_name = 'billing/invoice_confirm_delete.html'
     success_url = reverse_lazy('billing:invoice_list')
     staff_redirect_url = '/invoices/'
+
+    def post(self, request, *args, **kwargs):
+        from django.db.models import ProtectedError
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        try:
+            return super().post(request, *args, **kwargs)
+        except ProtectedError as e:
+            related_objects = e.protected_objects
+            abonos_info = []
+            for obj in related_objects:
+                if hasattr(obj, 'fecha') and hasattr(obj, 'valor'):
+                    abonos_info.append(f"Abono #{obj.id} por ${obj.valor} ({obj.fecha})")
+                else:
+                    abonos_info.append(str(obj))
+                    
+            error_msg = "No se puede eliminar la factura porque está protegida y vinculada a transacciones existentes. "
+            if abonos_info:
+                error_msg += f"Cobros/Abonos asociados: {', '.join(abonos_info)}. "
+            error_msg += "Por favor, elimine primero estos cobros o abonos en el módulo financiero antes de eliminar la factura."
+            
+            messages.error(request, error_msg)
+            return redirect('billing:invoice_list')
+
 
 # === REPORTES DE PRODUCTOS (Excel / PDF) ===
 @login_required
@@ -2387,3 +2838,19 @@ def invoice_paypal_capture(request, pk):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
             
     return JsonResponse({'status': 'error', 'message': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def profile_edit(request):
+    from .forms import UserProfileForm
+    if request.method == 'POST':
+        form = UserProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, '¡Tu perfil ha sido actualizado con éxito!')
+            return redirect('billing:home')
+    else:
+        form = UserProfileForm(instance=request.user)
+    return render(request, 'billing/profile_edit.html', {'form': form})
+
+

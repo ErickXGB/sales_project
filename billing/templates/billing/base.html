@@ -1,4 +1,5 @@
 {% load security_tags %}
+{% load static %}
 
 <!DOCTYPE html>
 <html lang="es">
@@ -6,88 +7,308 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Ventas{% endblock %}</title>
+  <title>{% block title %}ERP Ventas{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+  <script>
+    (function() {
+      const storedTheme = localStorage.getItem('theme');
+      if (storedTheme === 'dark') {
+        document.documentElement.setAttribute('data-bs-theme', 'dark');
+      } else {
+        document.documentElement.setAttribute('data-bs-theme', 'light');
+      }
+    })();
+  </script>
 </head>
 <body>
-  <!-- Barra de navegación -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container">
-      <a class="navbar-brand" href="{% url 'billing:home' %}">Sistema de Ventas</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="nav">
-      <ul class="navbar-nav me-auto">
-        {% if user.is_authenticated %}
+  
+  <div class="app-container {% if not user.is_authenticated %}no-sidebar{% endif %}" id="appContainer">
+    <script>
+      (function() {
+        const storedSidebar = localStorage.getItem('sidebar-compact');
+        if (storedSidebar === 'true' && window.innerWidth >= 992) {
+          document.getElementById('appContainer').classList.add('sidebar-compact');
+        }
+      })();
+    </script>
+    {% if user.is_authenticated %}
+    <!-- Sidebar de Navegación -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header d-flex align-items-center justify-content-between">
+        <a class="sidebar-brand d-flex align-items-center gap-2" href="{% url 'billing:home' %}">
+          <i class="bi bi-box-seam-fill text-primary"></i>
+          <span>VentasManager</span>
+        </a>
+        <button id="sidebarToggleCompact" class="btn btn-link text-white-50 p-0 border-0 d-none d-lg-flex align-items-center justify-content-center" style="width: 28px; height: 28px; border-radius: 50% !important; transition: all 0.2s;" title="Compactar menú">
+          <i id="compactIcon" class="bi bi-chevron-left" style="font-size: 1.1rem;"></i>
+        </button>
+      </div>
+      
+      <div class="sidebar-content">
+        <ul class="sidebar-menu">
+            <li class="sidebar-item">
+              <a href="{% url 'billing:home' %}" class="sidebar-link {% if request.resolver_match.view_name == 'billing:home' %}active{% endif %}">
+                <i class="bi bi-grid-1x2-fill"></i> <span>Panel de Control</span>
+              </a>
+            </li>
 
-          <!-- COMPRAS: Analista de Compras y Administrador -->
-          {% if user|has_group:'Compras' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:brand_list' %}">Marcas</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:productgroup_list' %}">Grupos</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:supplier_list' %}">Proveedores</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:product_list' %}">Productos</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'purchasing:purchase_list' %}">Compras</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'pagos:pagos_compras_home' %}">Pagos de Compras</a></li>
-          {% endif %}
+            <!-- SECCIÓN COMPRAS: Analista de Compras, Gerente y Administrador -->
+            {% if user|has_group:'Compras' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
+            <li class="sidebar-category">Compras e Inventario</li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:brand_list' %}" class="sidebar-link {% if 'brand' in request.path %}active{% endif %}">
+                <i class="bi bi-tags"></i> <span>Marcas</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:productgroup_list' %}" class="sidebar-link {% if 'productgroup' in request.path %}active{% endif %}">
+                <i class="bi bi-folder-fill"></i> <span>Grupos de Productos</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:supplier_list' %}" class="sidebar-link {% if 'supplier' in request.path %}active{% endif %}">
+                <i class="bi bi-truck"></i> <span>Proveedores</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:product_list' %}" class="sidebar-link {% if 'product/' in request.path or 'product_list' in request.resolver_match.view_name %}active{% endif %}">
+                <i class="bi bi-box"></i> <span>Productos</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'purchasing:purchase_list' %}" class="sidebar-link {% if 'purchases' in request.path %}active{% endif %}">
+                <i class="bi bi-receipt-cutoff"></i> <span>Registro Compras</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'pagos:pagos_compras_home' %}" class="sidebar-link {% if 'cobros/compras' in request.path or 'cobros/pagar' in request.path %}active{% endif %}">
+                <i class="bi bi-wallet2"></i> <span>Pagos Proveedores</span>
+              </a>
+            </li>
+            {% endif %}
 
-          <!-- VENTAS: Vendedor y Administrador -->
-          {% if user|has_group:'Ventas' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:customer_list' %}">Clientes</a></li>
-          <li class="nav-item"><a class="nav-link" href="{% url 'billing:invoice_list' %}">Facturas</a></li>
-          <li class="nav-item"> <a class="nav-link" href="{% url 'pagos:pagos_home' %}">Cobros</a></li>
-          {% endif %}
+            <!-- SECCIÓN VENTAS: Vendedor, Gerente y Administrador -->
+            {% if user|has_group:'Ventas' or user|has_group:'Administrador' or user|has_group:'Gerente' %}
+            <li class="sidebar-category">Ventas y Clientes</li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:customer_list' %}" class="sidebar-link {% if 'customer' in request.path %}active{% endif %}">
+                <i class="bi bi-people-fill"></i> <span>Clientes</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'billing:invoice_list' %}" class="sidebar-link {% if 'invoice' in request.path %}active{% endif %}">
+                <i class="bi bi-file-earmark-text-fill"></i> <span>Facturas Ventas</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{% url 'pagos:pagos_home' %}" class="sidebar-link {% if 'cobros/' in request.path and not 'compras' in request.path and not 'pagar' in request.path %}active{% endif %}">
+                <i class="bi bi-cash-stack"></i> <span>Cobros Clientes</span>
+              </a>
+            </li>
+            {% endif %}
 
-          <!-- SEGURIDAD: solo Administrador -->
-          {% if user|has_group:'Administrador' %}
-                      <li class="nav-item"><a class="nav-link" href="{% url 'security:security_home' %}">Seguridad</a></li>
-          {% endif %}
+            <!-- SEGURIDAD: solo Administrador -->
+            {% if user|has_group:'Administrador' %}
+            <li class="sidebar-category">Sistema</li>
+            <li class="sidebar-item">
+              <a href="{% url 'security:security_home' %}" class="sidebar-link {% if 'security' in request.path %}active{% endif %}">
+                <i class="bi bi-shield-lock-fill"></i> <span>Seguridad y Permisos</span>
+              </a>
+            </li>
+            <li class="sidebar-item">
+              <a href="{{ SRI_MICROSERVICE_CONFIG_URL }}" target="_blank" class="sidebar-link">
+                <i class="bi bi-cpu"></i> <span>Firmas SRI (Microservicio)</span>
+              </a>
+            </li>
+            {% endif %}
 
-        {% endif %}
-      </ul>
-        <ul class="navbar-nav">
+            <!-- NUEVA SECCIÓN -->
+            {% if user|has_group:'Administrador' %}
+            <li class="sidebar-category">Recursos Humanos</li>
+            <li class="sidebar-item">
+                <a href="{% url 'rrhh:sobretiempo_list' %}" class="sidebar-link {% if 'sobretiempo' in request.path %}active{% endif %}">
+                    <i class="bi bi-hourglass-split"></i> <span>Registro Sobretiempo</span>
+                </a>
+            </li>
+            {% endif %}
+
+        </ul>
+      </div>
+
+      <!-- Sidebar Footer has been removed as it is now available in the top-right dropdown -->
+    </aside>
+    {% endif %}
+
+    <!-- Área de Contenido Principal -->
+    <div class="main-wrapper">
+      <!-- Barra Superior -->
+      <header class="topbar shadow-sm">
+        <div class="d-flex align-items-center gap-3">
+          <button class="mobile-toggle" id="sidebarCollapse">
+            <i class="bi bi-list"></i>
+          </button>
+          <span class="topbar-title">
+            {% block heading %}{% endblock %}
+          </span>
+        </div>
+        
+        <div class="topbar-actions">
+          <!-- Botón de Alternancia de Tema (Modo Oscuro / Claro) -->
+          <button id="themeToggle" class="btn btn-link text-body p-2 border-0" aria-label="Cambiar tema" style="font-size: 1.25rem; display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50% !important; background: transparent;">
+            <i id="themeToggleIcon" class="bi bi-moon-stars-fill text-primary"></i>
+          </button>
+
           {% if user.is_authenticated %}
-          <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle text-light" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+          <div class="dropdown">
+            <a class="dropdown-toggle text-body text-decoration-none fw-semibold d-flex align-items-center gap-2" href="#" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center text-uppercase fw-bold" style="width: 32px; height: 32px;">
+                {{ user.username|slice:":1" }}
+              </div>
+              <span class="d-none d-sm-inline">{{ user.username }}</span>
             </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userDropdown" style="border-radius: 8px;">
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userMenu" style="border-radius: 12px; margin-top: 10px;">
+              <li>
+                <a class="dropdown-item py-2" href="{% url 'billing:profile_edit' %}">
+                  <i class="bi bi-gear-fill me-2 text-primary"></i>Configuración
+                </a>
+              </li>
+              {% if user|has_group:'Administrador' or user.is_superuser %}
+              <li>
+                <a class="dropdown-item py-2" href="{{ SRI_MICROSERVICE_CONFIG_URL }}" target="_blank">
+                  <i class="bi bi-shield-check me-2 text-primary"></i>Firmas SRI (Microservicio)
+                </a>
+              </li>
+              {% endif %}
               <li>
                 <a class="dropdown-item py-2" href="{% url 'password_change' %}">
-                  <i class="bi bi-key me-2 text-primary"></i>Cambiar contraseña
+                  <i class="bi bi-key-fill me-2 text-primary"></i>Cambiar contraseña
                 </a>
               </li>
               <li><hr class="dropdown-divider"></li>
               <li>
                 <form method="post" action="{% url 'logout' %}" class="m-0">
                   {% csrf_token %}
-                  <button type="submit" class="dropdown-item py-2 text-danger" style="background: none; border: none; width: 100%; text-align: left;">
+                  <button type="submit" class="dropdown-item py-2 text-danger w-100 text-start" style="background: none; border: none;">
                     <i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión
                   </button>
                 </form>
               </li>
             </ul>
-          </li>
+          </div>
           {% else %}
-          <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a></li>
+          <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Iniciar Sesión</a>
           {% endif %}
-        </ul>
-      </div>
+        </div>
+      </header>
+
+      <!-- Contenedor Principal -->
+      <main class="main-content">
+        {% if messages %}
+          {% for m in messages %}
+          <div class="alert alert-{% if m.tags == 'error' %}danger{% else %}{{ m.tags }}{% endif %} alert-dismissible fade show border-0 shadow-sm mb-4" role="alert">
+            <div class="d-flex align-items-center gap-2">
+              {% if m.tags == 'success' %}
+                <i class="bi bi-check-circle-fill fs-5"></i>
+              {% elif m.tags == 'warning' %}
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+              {% elif m.tags == 'danger' or m.tags == 'error' %}
+                <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+              {% else %}
+                <i class="bi bi-info-circle-fill fs-5"></i>
+              {% endif %}
+              <span>{{ m }}</span>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+          {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+      </main>
     </div>
-  </nav>
-  <!-- Contenido principal -->
-  <div class="container mt-4">
-    {% if messages %}
-    {% for m in messages %}
-    <div class="alert alert-{{ m.tags }} alert-dismissible fade show">
-      {{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {% endfor %}
-    {% endif %}
-    {% block content %}{% endblock %}
   </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Lógica de Alternancia de Tema (Modo Oscuro / Claro)
+      const themeToggle = document.getElementById('themeToggle');
+      const themeToggleIcon = document.getElementById('themeToggleIcon');
+      
+      if (themeToggle && themeToggleIcon) {
+        function updateIcon(theme) {
+          if (theme === 'dark') {
+            themeToggleIcon.className = 'bi bi-sun-fill text-warning';
+          } else {
+            themeToggleIcon.className = 'bi bi-moon-stars-fill text-primary';
+          }
+        }
+        
+        const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+        updateIcon(currentTheme);
+        
+        themeToggle.addEventListener('click', function() {
+          const activeTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+          let newTheme = 'light';
+          
+          if (activeTheme === 'light') {
+            newTheme = 'dark';
+          }
+          
+          document.documentElement.setAttribute('data-bs-theme', newTheme);
+          localStorage.setItem('theme', newTheme);
+          updateIcon(newTheme);
+        });
+      }
+
+      // Lógica de Compactación de Barra Lateral
+      const sidebarToggleCompact = document.getElementById('sidebarToggleCompact');
+      const appContainer = document.getElementById('appContainer');
+      const compactIcon = document.getElementById('compactIcon');
+      
+      if (sidebarToggleCompact && appContainer && compactIcon) {
+        function updateCompactIcon(isCompact) {
+          if (isCompact) {
+            compactIcon.className = 'bi bi-chevron-right';
+            sidebarToggleCompact.setAttribute('title', 'Expandir menú');
+          } else {
+            compactIcon.className = 'bi bi-chevron-left';
+            sidebarToggleCompact.setAttribute('title', 'Compactar menú');
+          }
+        }
+        
+        // Configuración inicial
+        const isInitiallyCompact = appContainer.classList.contains('sidebar-compact');
+        updateCompactIcon(isInitiallyCompact);
+        
+        sidebarToggleCompact.addEventListener('click', function() {
+          const isCompact = appContainer.classList.toggle('sidebar-compact');
+          localStorage.setItem('sidebar-compact', isCompact);
+          updateCompactIcon(isCompact);
+        });
+      }
+
+      const sidebarToggle = document.getElementById('sidebarCollapse');
+      const sidebar = document.getElementById('sidebar');
+      
+      if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function(e) {
+          e.stopPropagation();
+          sidebar.classList.toggle('show');
+        });
+        
+        document.addEventListener('click', function(e) {
+          if (window.innerWidth < 992) {
+            if (sidebar.classList.contains('show') && !sidebar.contains(e.target) && e.target !== sidebarToggle) {
+              sidebar.classList.remove('show');
+            }
+          }
+        });
+      }
+    });
+  </script>
 </body>
 
 </html>

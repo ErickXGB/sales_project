@@ -1,0 +1,63 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}Listado de Sobretiempos{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Gestión de Sobretiempos</h4>
+        <div class="d-flex gap-2">
+            <a href="{% url 'rrhh:sobretiempo_resumen' %}" class="btn btn-outline-dark btn-sm font-weight-bold">
+                <i class="bi bi-bar-chart-fill"></i> Resumen
+            </a>
+            <a href="{% url 'rrhh:sobretiempo_list_pdf' %}" class="btn btn-outline-danger btn-sm font-weight-bold" title="Exportar PDF Completo">
+                <i class="bi bi-file-pdf-fill"></i> PDF
+            </a>
+            <a href="{% url 'rrhh:sobretiempo_list_excel' %}" class="btn btn-outline-success btn-sm font-weight-bold" title="Exportar Excel Completo">
+                <i class="bi bi-file-excel-fill"></i> Excel
+            </a>
+            <a href="{% url 'rrhh:sobretiempo_create' %}" class="btn btn-dark btn-sm">
+                <i class="bi bi-plus-lg"></i> Registrar
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th>Fecha de Registro</th>
+                        <th>Horas del Mes</th>
+                        <th>Sueldo Mensual</th>
+                        <th>Total Calculado</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for st in sobretiempos %}
+                    <tr>
+                        <td>{{ st.empleado.nombres }}</td>
+                        <td>{{ st.fecha_registro|date:"d/m/Y" }}</td>
+                        <td>{{ st.total_horas }}</td>
+                        <td>${{ st.sueldo_mensual }}</td>
+                        <td class="fw-bold text-success">${{ st.total_calculado }}</td>
+                        <td class="text-center">
+                            <a href="{% url 'rrhh:sobretiempo_detail' st.id %}" class="btn btn-sm btn-outline-info me-1" title="Ver Detalle"><i class="bi bi-eye"></i></a>
+                            <a href="{% url 'rrhh:sobretiempo_detail_pdf' st.id %}" class="btn btn-sm btn-outline-danger me-1" title="Descargar PDF"><i class="bi bi-file-pdf"></i></a>
+                            <a href="{% url 'rrhh:sobretiempo_detail_excel' st.id %}" class="btn btn-sm btn-outline-success me-1" title="Descargar Excel"><i class="bi bi-file-excel"></i></a>
+                            <a href="{% url 'rrhh:sobretiempo_update' st.id %}" class="btn btn-sm btn-outline-warning me-1" title="Editar"><i class="bi bi-pencil"></i></a>
+                            <a href="{% url 'rrhh:sobretiempo_delete' st.id %}" class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">No se han registrado sobretiempos.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

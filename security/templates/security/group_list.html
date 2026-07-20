@@ -5,50 +5,122 @@
 {% csrf_token %}
 
 <style>
-    .matrix-switch:checked {
-        background-color: #198754 !important;
-        border-color: #198754 !important;
-    }
     .matrix-switch {
-        width: 2.3em !important;
-        height: 1.15em !important;
+        width: 2.5em !important;
+        height: 1.25em !important;
         cursor: pointer;
-        transition: background-color 0.2s ease, border-color 0.2s ease;
+        transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .matrix-switch:focus {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+    }
+    .matrix-switch:checked {
+        background-color: #06d6a0 !important;
+        border-color: #06d6a0 !important;
+        transform: scale(1.08);
     }
     .matrix-container {
         overflow-x: auto;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.08);
+    }
+    .matrix-container::-webkit-scrollbar {
+        height: 8px;
+    }
+    .matrix-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    .matrix-container::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+    }
+    .matrix-container::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+    }
+    .matrix-table {
+        border-collapse: separate;
+        border-spacing: 0;
     }
     .matrix-table th {
-        font-size: 0.85rem;
+        font-size: 0.78rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.8px;
         vertical-align: middle;
+        padding: 12px 10px !important;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border-bottom: 2px solid var(--border-color) !important;
     }
     .matrix-table td {
         vertical-align: middle;
+        padding: 14px 10px !important;
     }
     .badge-status {
-        font-size: 0.75rem;
-        padding: 5px 8px;
-        border-radius: 20px;
+        font-size: 0.72rem;
+        padding: 6px 12px;
+        border-radius: 30px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+    }
+    /* Dynamic color headers for groups */
+    th.group-billing { 
+        background-color: #e6f0fa !important; 
+        color: #0b5ed7 !important; 
+        font-weight: 800; 
+        border-bottom: 2px solid #b6d4fe !important;
+    }
+    th.group-purchasing { 
+        background-color: #eaf5ec !important; 
+        color: #157347 !important; 
+        font-weight: 800;
+        border-bottom: 2px solid #badbcc !important;
+    }
+    th.group-pagos { 
+        background-color: #fff9e6 !important; 
+        color: #b07d00 !important; 
+        font-weight: 800;
+        border-bottom: 2px solid #ffe69c !important;
+    }
+    th.group-security { 
+        background-color: #e6f8fc !important; 
+        color: #087990 !important; 
+        font-weight: 800;
+        border-bottom: 2px solid #9eeaf9 !important;
+    }
+    .cell-disabled {
+        background-color: #fafbfc !important;
+        color: #ccc;
+        font-weight: 600;
+    }
+    .group-row {
+        transition: background-color 0.25s ease;
+    }
+    .group-row:hover {
+        background-color: rgba(0,0,0,0.01) !important;
     }
     /* Fixed column headers */
     .sticky-col {
         position: sticky;
         left: 0;
-        background-color: #fff;
+        background-color: #ffffff;
         z-index: 5;
-        border-right: 2px solid #dee2e6 !important;
+        border-right: 2px solid rgba(0,0,0,0.1) !important;
+        box-shadow: 4px 0 8px rgba(0,0,0,0.02);
     }
     .matrix-table tr:hover .sticky-col {
-        background-color: #f8f9fa;
+        background-color: #fcfdfe;
     }
     th.sticky-col {
         background-color: #212529 !important;
-        color: #fff !important;
+        color: #ffffff !important;
         z-index: 6;
+        border-right: 2px solid rgba(255,255,255,0.15) !important;
     }
 </style>
 
@@ -75,7 +147,7 @@
     <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
-            <input type="text" id="search-group" class="form-control border-start-0" placeholder="Filtrar roles / grupos...">
+            <input type="text" id="search-group" class="form-control border-start-0" placeholder="Buscar módulo o permiso...">
         </div>
     </div>
 </div>
@@ -83,70 +155,145 @@
 <!-- Contenedor de la Matriz -->
 <div class="card border-0 mb-5">
     <div class="card-body p-0">
-        <div class="matrix-container bg-white" style="max-height: 600px;">
+        <div class="matrix-container bg-white" style="max-height: 700px;">
             <table class="table table-bordered table-hover matrix-table mb-0 align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th class="sticky-col text-center" style="min-width: 220px;" rowspan="2">Grupo / Rol</th>
-                        <th class="text-center align-middle" style="min-width: 150px;" rowspan="2">Estado / Permisos</th>
-                        {% for model in models_config %}
-                        <th colspan="4" class="text-center border-start border-end py-2 bg-dark-emphasis">{{ model.label }}</th>
-                        {% endfor %}
-                    </tr>
-                    <tr>
-                        {% for model in models_config %}
-                            {% for action in actions %}
-                            <th class="text-center py-1 small border-start border-end" style="min-width: 65px;" title="{{ action.label }} {{ model.label }}">
-                                {{ action.label }}
-                            </th>
-                            {% endfor %}
+                        <th class="ps-3" style="min-width: 250px;">Módulo / Permiso</th>
+                        <th style="min-width: 180px;">Código de Permiso</th>
+                        {% for row in groups_data %}
+                        <th class="text-center" style="min-width: 150px;">
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold">{{ row.group.name }}</span>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'security:group_update' row.group.pk %}" class="btn btn-outline-light py-0 px-1 border-0" style="font-size: 0.8rem;" title="Editar"><i class="bi bi-pencil"></i></a>
+                                        <a href="{% url 'security:group_delete' row.group.pk %}" class="btn btn-outline-danger py-0 px-1 border-0" style="font-size: 0.8rem;" title="Eliminar"><i class="bi bi-trash"></i></a>
+                                    </div>
+                                </div>
+                                <span id="badge-{{ row.group.id }}" class="badge badge-status {% if row.total_count == total_permissions_count %}bg-success{% elif row.total_count > 0 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {% if row.total_count == total_permissions_count %}
+                                    Acceso Total
+                                    {% elif row.total_count > 0 %}
+                                    Acceso Intermedio
+                                    {% else %}
+                                    Sin Acceso
+                                    {% endif %}
+                                    <span class="ms-1 fw-bold">({{ row.total_count }}/{{ total_permissions_count }})</span>
+                                </span>
+                            </div>
+                        </th>
                         {% endfor %}
                     </tr>
                 </thead>
                 <tbody id="matrix-body">
-                    {% for row in groups_data %}
-                    <tr class="group-row" data-group-name="{{ row.group.name|lower }}">
-                        <td class="sticky-col fw-bold">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span>{{ row.group.name }}</span>
-                                <div class="btn-group btn-group-sm ms-2">
-                                    <a href="{% url 'security:group_update' row.group.pk %}" class="btn btn-outline-secondary py-0 px-1" title="Editar"><i class="bi bi-pencil"></i></a>
-                                    <a href="{% url 'security:group_delete' row.group.pk %}" class="btn btn-outline-danger py-0 px-1" title="Eliminar"><i class="bi bi-trash"></i></a>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="text-center">
-                            <span id="badge-{{ row.group.id }}" class="badge badge-status {% if row.total_count == total_permissions_count %}bg-success{% elif row.total_count > 0 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                                {% if row.total_count == total_permissions_count %}
-                                Acceso Total
-                                {% elif row.total_count > 0 %}
-                                Acceso Intermedio
+                    {% for model in models_config %}
+                        <!-- Fila de cabecera de Módulo -->
+                        <tr class="model-header-row table-secondary">
+                            <td colspan="{{ groups_data|length|add:2 }}" class="fw-bold text-primary py-2 px-3 fs-6">
+                                {% if model.codename_base in 'brand,productgroup,product,customer,invoice' %}
+                                    <i class="bi bi-folder-fill me-2 text-primary"></i>
+                                {% elif model.codename_base in 'supplier,purchase' %}
+                                    <i class="bi bi-truck me-2 text-success"></i>
+                                {% elif model.codename_base in 'cobrofactura,pagocompra' %}
+                                    <i class="bi bi-cash-stack me-2 text-warning"></i>
                                 {% else %}
-                                Sin Acceso
+                                    <i class="bi bi-shield-lock-fill me-2 text-info"></i>
                                 {% endif %}
-                                <span class="ms-1 fw-bold">({{ row.total_count }}/{{ total_permissions_count }})</span>
-                            </span>
-                        </td>
-                        {% for model in models_config %}
-                            {% for action in actions %}
-                                {% with codename=action.suffix|add:"_"|add:model.codename_base %}
-                                <td class="text-center border-start border-end">
-                                    <div class="form-check form-switch d-inline-block">
-                                        <input class="form-check-input matrix-switch" type="checkbox" role="switch"
-                                            data-group-id="{{ row.group.id }}"
-                                            data-codename="{{ codename }}"
-                                            {% if codename in row.perms %}checked{% endif %}
-                                            onclick="togglePermission(this)">
-                                    </div>
-                                </td>
+                                {{ model.label }}
+                            </td>
+                        </tr>
+                        
+                        {% for action in actions %}
+                            {% if action.suffix == 'download_pdf' %}
+                                {% with codename="download_"|add:model.codename_base|add:"_pdf" %}
+                                <tr class="permission-row" data-permission-name="{{ action.label|lower }} {{ model.label|lower }}">
+                                    <td class="ps-4 fw-medium text-body">
+                                        <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>{{ action.label }}
+                                    </td>
+                                    <td class="text-muted small font-monospace">{{ codename }}</td>
+                                    {% for row in groups_data %}
+                                    <td class="text-center {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                        {% if codename in db_permissions %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                data-group-id="{{ row.group.id }}"
+                                                data-codename="{{ codename }}"
+                                                {% if codename in row.perms %}checked{% endif %}
+                                                onclick="togglePermission(this)">
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
                                 {% endwith %}
-                            {% endfor %}
+                            {% elif action.suffix == 'download_excel' %}
+                                {% with codename="download_"|add:model.codename_base|add:"_excel" %}
+                                <tr class="permission-row" data-permission-name="{{ action.label|lower }} {{ model.label|lower }}">
+                                    <td class="ps-4 fw-medium text-body">
+                                        <i class="bi bi-file-earmark-excel me-2 text-success"></i>{{ action.label }}
+                                    </td>
+                                    <td class="text-muted small font-monospace">{{ codename }}</td>
+                                    {% for row in groups_data %}
+                                    <td class="text-center {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                        {% if codename in db_permissions %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                data-group-id="{{ row.group.id }}"
+                                                data-codename="{{ codename }}"
+                                                {% if codename in row.perms %}checked{% endif %}
+                                                onclick="togglePermission(this)">
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endwith %}
+                            {% else %}
+                                {% with codename=action.suffix|add:"_"|add:model.codename_base %}
+                                <tr class="permission-row" data-permission-name="{{ action.label|lower }} {{ model.label|lower }}">
+                                    <td class="ps-4 fw-medium text-body">
+                                        {% if action.suffix == 'view' %}
+                                            <i class="bi bi-eye me-2 text-primary"></i>
+                                        {% elif action.suffix == 'detail' %}
+                                            <i class="bi bi-info-circle me-2 text-info"></i>
+                                        {% elif action.suffix == 'add' %}
+                                            <i class="bi bi-plus-circle me-2 text-success"></i>
+                                        {% elif action.suffix == 'change' %}
+                                            <i class="bi bi-pencil-square me-2 text-warning"></i>
+                                        {% elif action.suffix == 'delete' %}
+                                            <i class="bi bi-trash me-2 text-danger"></i>
+                                        {% elif action.suffix == 'whatsapp' %}
+                                            <i class="bi bi-whatsapp me-2 text-success"></i>
+                                        {% else %}
+                                            <i class="bi bi-gear me-2 text-secondary"></i>
+                                        {% endif %}
+                                        {{ action.label }}
+                                    </td>
+                                    <td class="text-muted small font-monospace">{{ codename }}</td>
+                                    {% for row in groups_data %}
+                                    <td class="text-center {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                        {% if codename in db_permissions %}
+                                        <div class="form-check form-switch d-inline-block">
+                                            <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                data-group-id="{{ row.group.id }}"
+                                                data-codename="{{ codename }}"
+                                                {% if codename in row.perms %}checked{% endif %}
+                                                onclick="togglePermission(this)">
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endwith %}
+                            {% endif %}
                         {% endfor %}
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="{{ total_permissions_count|add:2 }}" class="text-center py-4">No hay grupos registrados.</td>
-                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -154,19 +301,29 @@
     </div>
 </div>
 
+{% include 'shared/pagination.html' %}
+
 <script>
-    // Filtrador de grupos
+    // Filtrador de permisos y módulos
     document.getElementById('search-group').addEventListener('input', function(e) {
         const query = e.target.value.toLowerCase();
-        const rows = document.querySelectorAll('.group-row');
-        rows.forEach(row => {
-            const name = row.getAttribute('data-group-name');
-            if (name.includes(query)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+        const permissionRows = document.querySelectorAll('.permission-row');
+        const headerRows = document.querySelectorAll('.model-header-row');
+        
+        if (query === '') {
+            permissionRows.forEach(row => row.style.display = '');
+            headerRows.forEach(row => row.style.display = '');
+        } else {
+            headerRows.forEach(row => row.style.display = 'none');
+            permissionRows.forEach(row => {
+                const name = row.getAttribute('data-permission-name');
+                if (name.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
     });
 
     // Toggle Permission AJAX

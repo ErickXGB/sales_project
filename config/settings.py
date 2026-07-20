@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-@f!6oabfy-xeaa#h#$8afey8vb_3v_d^7fa6%c*8%5k4poyyp=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'purchasing',  # Nuestra app de compras
     'security', # Nuestra app de seguridad
     'pagos', # Nuestra app de pagos y cobros
+    'RRHH', # Nuestra app de recursos humanos
     'django_extensions',
 ]
 
@@ -67,6 +68,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'billing.context_processors.sri_settings',
             ],
         },
     },
@@ -121,6 +123,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (uploads)
 MEDIA_URL = '/media/'
@@ -141,3 +145,11 @@ DEFAULT_FROM_EMAIL = config('EMAIL_HOST_USER')
 
 # PayPal Config
 PAYPAL_CLIENT_ID = config('PAYPAL_CLIENT_ID', default='sb')
+
+# Permitir popups de terceros (PayPal Sandbox) en navegadores modernos
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
+# Configuración de URL del Microservicio de Facturación SRI
+SRI_MICROSERVICE_URL = config('SRI_MICROSERVICE_URL', default='https://sri-microservice.vercel.app/firmar-y-enviar')
+
+

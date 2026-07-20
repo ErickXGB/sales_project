@@ -70,13 +70,19 @@
 
         <div class="mt-4">
             <a href="{% url 'purchasing:purchase_list' %}" class="btn btn-secondary">Volver al listado</a>
+            {% if perms.purchasing.download_purchase_pdf %}
             <a href="{% url 'purchasing:purchase_pdf' purchase.pk %}" class="btn btn-primary"><i class="bi bi-printer me-1"></i>Imprimir / PDF</a>
-            {% if purchase.whatsapp_phone %}
-            <a href="https://wa.me/{{ purchase.whatsapp_phone }}?text={{ purchase.whatsapp_message|urlencode }}" target="_blank" class="btn btn-success"><i class="bi bi-whatsapp me-1"></i>Notificar por WhatsApp</a>
-            {% else %}
-            <button class="btn btn-secondary" disabled title="El proveedor no tiene teléfono registrado"><i class="bi bi-whatsapp me-1"></i>WhatsApp no disponible</button>
             {% endif %}
+            {% if perms.purchasing.whatsapp_purchase %}
+              {% if purchase.whatsapp_phone %}
+              <a href="https://wa.me/{{ purchase.whatsapp_phone }}?text={{ purchase.whatsapp_message|urlencode }}" target="_blank" class="btn btn-success"><i class="bi bi-whatsapp me-1"></i>Notificar por WhatsApp</a>
+              {% else %}
+              <button class="btn btn-secondary" disabled title="El proveedor no tiene teléfono registrado"><i class="bi bi-whatsapp me-1"></i>WhatsApp no disponible</button>
+              {% endif %}
+            {% endif %}
+            {% if perms.purchasing.delete_purchase %}
             <a href="{% url 'purchasing:purchase_delete' purchase.pk %}" class="btn btn-danger">Eliminar</a>
+            {% endif %}
         </div>
     </div>
 </div>

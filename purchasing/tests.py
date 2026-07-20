@@ -6,9 +6,17 @@ class PurchaseFormTest(TestCase):
     def setUp(self):
         # Create a test user
         self.user = User.objects.create_user(username='testuser', password='password123')
-        # Add the user to the required group so the view allows access
-        from django.contrib.auth.models import Group
-        group, _ = Group.objects.get_or_create(name='Analista de Compras')
+        # Add the user to the required group and assign permissions so the view allows access
+        from django.contrib.auth.models import Group, Permission
+        group, _ = Group.objects.get_or_create(name='Compras')
+        
+        try:
+            add_perm = Permission.objects.get(codename='add_purchase')
+            view_perm = Permission.objects.get(codename='view_purchase')
+            group.permissions.add(add_perm, view_perm)
+        except Permission.DoesNotExist:
+            pass
+            
         self.user.groups.add(group)
 
     def test_purchase_create_requires_login(self):

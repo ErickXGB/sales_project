@@ -3,30 +3,44 @@
 {% block content %}
 <h2>Productos</h2>
 
-<!-- Buscador por campos (Compacto) -->
-<form method="get" class="mb-4">
-  <div class="input-group shadow-sm" style="max-width: 700px;">
-    <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
-    <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
-      <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
-      <option value="name" {% if search_field == 'name' %}selected{% endif %}>Nombre del Producto</option>
-      <option value="brand" {% if search_field == 'brand' %}selected{% endif %}>Marca</option>
-      <option value="group" {% if search_field == 'group' %}selected{% endif %}>Categoría</option>
-      <option value="supplier" {% if search_field == 'supplier' %}selected{% endif %}>Proveedor</option>
-      <option value="price" {% if search_field == 'price' %}selected{% endif %}>Precio ($)</option>
-      <option value="stock" {% if search_field == 'stock' %}selected{% endif %}>Stock</option>
-      <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
-    </select>
-    <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle" placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
-    <button type="submit" class="btn btn-primary">Buscar</button>
-    <a href="{% url 'billing:product_list' %}" class="btn btn-outline-secondary">Limpiar</a>
-  </div>
-</form>
+<!-- Buscador y Acciones (Alineados) -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  <form method="get" class="m-0 flex-grow-1" style="max-width: 700px;">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-light fw-bold text-secondary">Buscar por</span>
+      <select name="search_field" id="search_field" class="form-select border-secondary-subtle" style="max-width: 180px;">
+        <option value="all" {% if search_field == 'all' or not search_field %}selected{% endif %}>Todos los campos</option>
+        <option value="name" {% if search_field == 'name' %}selected{% endif %}>Nombre del Producto</option>
+        <option value="brand" {% if search_field == 'brand' %}selected{% endif %}>Marca</option>
+        <option value="group" {% if search_field == 'group' %}selected{% endif %}>Categoría</option>
+        <option value="supplier" {% if search_field == 'supplier' %}selected{% endif %}>Proveedor</option>
+        <option value="price" {% if search_field == 'price' %}selected{% endif %}>Precio ($)</option>
+        <option value="stock" {% if search_field == 'stock' %}selected{% endif %}>Stock</option>
+        <option value="active" {% if search_field == 'active' %}selected{% endif %}>Estado (Activo/Inactivo)</option>
+      </select>
+      <input type="text" name="search_value" id="search_value" class="form-control border-secondary-subtle" placeholder="Ingrese el término a buscar..." value="{{ search_value|default:'' }}">
+      <button type="submit" class="btn btn-primary">Buscar</button>
+      <a href="{% url 'billing:product_list' %}" class="btn btn-outline-secondary">Limpiar</a>
+    </div>
+  </form>
 
-<div class="mb-3 d-flex gap-2">
-  <a href="{% url 'billing:product_create' %}" class="btn btn-success">+ Nuevo Producto</a>
-  <a href="{% url 'billing:product_report_pdf' %}" class="btn btn-danger">Descargar PDF</a>
-  <a href="{% url 'billing:product_report_excel' %}" class="btn btn-primary" style="background-color: #1f7246; border-color: #1f7246;">Descargar Excel</a>
+  <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+    {% if perms.billing.download_product_pdf %}
+    <a href="{% url 'billing:product_report_pdf' %}" class="btn btn-action-pdf d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-file-earmark-pdf-fill"></i> PDF
+    </a>
+    {% endif %}
+    {% if perms.billing.download_product_excel %}
+    <a href="{% url 'billing:product_report_excel' %}" class="btn btn-action-excel d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-file-earmark-excel-fill"></i> Excel
+    </a>
+    {% endif %}
+    {% if perms.billing.add_product %}
+    <a href="{% url 'billing:product_create' %}" class="btn btn-action-add d-flex align-items-center gap-2 fw-semibold">
+      + Producto
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 <table class="table table-striped table-hover align-middle">
@@ -59,6 +73,7 @@
         {% endif %}
       </td>
       <td>
+        {% if perms.billing.detail_product %}
         <button type="button" class="btn btn-sm btn-info text-white btn-view-product"
                 data-id="{{ item.pk }}"
                 data-name="{{ item.name|escape }}"
@@ -73,6 +88,7 @@
                 data-active="{% if item.is_active %}Sí{% else %}No{% endif %}">
           Ver
         </button>
+        {% endif %}
       </td>
       <td>{{ item.name }}</td>
       <td>{{ item.brand.name }}</td>
@@ -88,8 +104,12 @@
         {% endfor %}
       </td>
       <td>
+        {% if perms.billing.change_product %}
         <a href="{% url 'billing:product_update' item.pk %}" class="btn btn-sm btn-warning">Editar</a>
+        {% endif %}
+        {% if perms.billing.delete_product %}
         <a href="{% url 'billing:product_delete' item.pk %}" class="btn btn-sm btn-danger">Eliminar</a>
+        {% endif %}
       </td>
     </tr>
     {% empty %}
@@ -99,6 +119,8 @@
     {% endfor %}
   </tbody>
 </table>
+
+{% include 'shared/pagination.html' %}
 
 <!-- Modal de Detalles del Producto -->
 <div class="modal fade" id="productDetailModal" tabindex="-1" aria-labelledby="productDetailModalLabel" aria-hidden="true">

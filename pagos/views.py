@@ -14,7 +14,7 @@ from .models import CobroFactura, PagoCompra
 from .forms import CobroFacturaForm, PagoCompraForm
 
 class PagosHomeView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
-    permission_required = 'billing.view_invoice'
+    permission_required = 'pagos.view_cobrofactura'
     template_name = 'pagos/pagos_home.html'
 
     def get_context_data(self, **kwargs):
@@ -47,10 +47,11 @@ class PagosHomeView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
         return context
 
 class FacturasPendientesListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'billing.view_invoice'
+    permission_required = 'pagos.view_cobrofactura'
     model = Invoice
     template_name = 'pagos/pagos_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         # Muestra únicamente facturas a CRÉDITO pendientes de cobro y activas
@@ -223,6 +224,7 @@ class HistorialPagosListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
     model = CobroFactura
     template_name = 'pagos/historial_pagos.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = CobroFactura.objects.select_related('factura', 'factura__customer')
@@ -253,10 +255,11 @@ class HistorialPagosListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
 
 
 class FacturasPagadasListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'billing.view_invoice'
+    permission_required = 'pagos.view_cobrofactura'
     model = Invoice
     template_name = 'pagos/facturas_pagadas.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         # Muestra únicamente facturas a CRÉDITO completamente canceladas y activas
@@ -311,7 +314,7 @@ class FacturasPagadasListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
 # ==============================================================================
 
 class PagosComprasHomeView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
-    permission_required = 'purchasing.view_purchase'
+    permission_required = 'pagos.view_pagocompra'
     template_name = 'pagos/pagos_compras_home.html'
 
     def get_context_data(self, **kwargs):
@@ -345,10 +348,11 @@ class PagosComprasHomeView(LoginRequiredMixin, PermissionRequiredMixin, Template
 
 
 class ComprasPendientesListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'purchasing.view_purchase'
+    permission_required = 'pagos.view_pagocompra'
     model = Purchase
     template_name = 'pagos/compras_list.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         # Muestra únicamente compras a CRÉDITO pendientes de pago y activas
@@ -392,10 +396,11 @@ class ComprasPendientesListView(LoginRequiredMixin, PermissionRequiredMixin, Lis
 
 
 class ComprasPagadasListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'purchasing.view_purchase'
+    permission_required = 'pagos.view_pagocompra'
     model = Purchase
     template_name = 'pagos/compras_pagadas.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = Purchase.objects.filter(
@@ -573,10 +578,11 @@ class PagoCompraDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteVi
 
 
 class HistorialPagosComprasListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'purchasing.view_purchase'
+    permission_required = 'pagos.view_pagocompra'
     model = PagoCompra
     template_name = 'pagos/historial_pagos_compras.html'
     context_object_name = 'items'
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = PagoCompra.objects.select_related('compra', 'compra__supplier').all()

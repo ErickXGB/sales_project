@@ -91,9 +91,11 @@
                                 </td>
                                 <td class="text-end fw-bold text-danger">${{ comp.saldo }}</td>
                                 <td class="text-center">
+                                    {% if perms.pagos.add_pagocompra %}
                                     <a href="{% url 'pagos:registrar_pago_compra' comp.id %}" class="btn btn-sm btn-success" title="Registrar Pago">
                                         <i class="bi bi-plus-circle me-1"></i>Pagar
                                     </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% empty %}

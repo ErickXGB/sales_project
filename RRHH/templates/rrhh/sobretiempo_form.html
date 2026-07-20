@@ -1,0 +1,383 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}{% if object %}Editar{% else %}Crear{% endif %} Sobretiempo{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h4 class="mb-0">{% if object %}Editar{% else %}Registrar{% endif %} Sobretiempo</h4>
+    </div>
+    <div class="card-body">
+        <form method="post" id="sobretiempo-form">
+            {% csrf_token %}
+            
+            <!-- Cabecera Maestro -->
+            <div class="card mb-4 border-secondary">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Información General</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="{{ form.empleado.id_for_label }}" class="form-label fw-bold">Empleado</label>
+                            {{ form.empleado }}
+                            {% if form.empleado.errors %}
+                                <div class="text-danger small">{{ form.empleado.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.fecha_registro.id_for_label }}" class="form-label fw-bold">Fecha de Registro</label>
+                            {{ form.fecha_registro }}
+                            {% if form.fecha_registro.errors %}
+                                <div class="text-danger small">{{ form.fecha_registro.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.total_horas.id_for_label }}" class="form-label fw-bold">Horas del Mes (Divisor)</label>
+                            {{ form.total_horas }}
+                            {% if form.total_horas.errors %}
+                                <div class="text-danger small">{{ form.total_horas.errors }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="{{ form.sueldo_mensual.id_for_label }}" class="form-label fw-bold">Sueldo Mensual ($)</label>
+                            {{ form.sueldo_mensual }}
+                            {% if form.sueldo_mensual.errors %}
+                                <div class="text-danger small">{{ form.sueldo_mensual.errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detalle Formset -->
+            <div class="card mb-4 border-secondary">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Tipos de Sobretiempo Trabajados</h5>
+                    <button type="button" class="btn btn-sm btn-outline-success" id="add-row-btn">
+                        <i class="bi bi-plus-lg"></i> Agregar Detalle
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    {{ detalles.management_form }}
+                    
+                    {% if detalles.non_form_errors %}
+                        <div class="alert alert-danger m-3">
+                            {% for error in detalles.non_form_errors %}
+                                <div><i class="bi bi-exclamation-triangle-fill me-2"></i>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0" id="detalles-table">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th>Tipo de Sobretiempo</th>
+                                    <th style="width: 250px;">Número de Horas</th>
+                                    <th class="text-center" style="width: 100px;">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="detalles-tbody">
+                                {% for form_detalle in detalles %}
+                                <tr class="detalle-row">
+                                    <td>
+                                        {{ form_detalle.id }}
+                                        {{ form_detalle.tipo_sobretiempo }}
+                                        {% if form_detalle.tipo_sobretiempo.errors %}
+                                            <div class="text-danger small">{{ form_detalle.tipo_sobretiempo.errors }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form_detalle.numero_horas }}
+                                        {% if form_detalle.numero_horas.errors %}
+                                            <div class="text-danger small">{{ form_detalle.numero_horas.errors }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center align-middle">
+                                        {% if form_detalle.instance.pk %}
+                                            <!-- Checkbox para eliminar si el registro ya está en BD -->
+                                            <div class="form-check d-flex justify-content-center">
+                                                {{ form_detalle.DELETE }}
+                                            </div>
+                                        {% else %}
+                                            <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" style="border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 28px;">
+                                                &times;
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td class="text-end fw-bold">Total Previsualizado (USD):</td>
+                                    <td class="fw-bold text-success fs-5" id="live-total-preview">$0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="d-flex justify-content-end gap-2 mb-3">
+                <a href="{% url 'rrhh:sobretiempo_list' %}" class="btn btn-secondary">Cancelar</a>
+                <button type="submit" class="btn btn-warning fw-bold text-dark">
+                    Guardar Registro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Template oculto de fila vacía de Django Formset -->
+<div style="display:none;" id="empty-row-template">
+    <table>
+        <tbody>
+            <tr class="detalle-row">
+                <td>
+                    {{ detalles.empty_form.id }}
+                    {{ detalles.empty_form.tipo_sobretiempo }}
+                </td>
+                <td>
+                    {{ detalles.empty_form.numero_horas }}
+                </td>
+                <td class="text-center align-middle">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" style="border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 28px;">
+                        &times;
+                    </button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // 1. Lógica para rellenar automáticamente el sueldo del empleado y calcular totales
+    const empleadosData = {{ empleados_json|safe }};
+    const tiposData = {{ tipos_json|safe }};
+    
+    const selectEmpleado = document.getElementById("id_empleado");
+    const inputSueldo = document.getElementById("id_sueldo_mensual");
+    const inputTotalHoras = document.getElementById("id_total_horas") || { value: 240 };
+    const liveTotalPreview = document.getElementById("live-total-preview");
+    const tbody = document.getElementById("detalles-tbody");
+
+    // Función de recálculo en tiempo real
+    function recalculateLiveTotal() {
+        const sueldo = parseFloat(inputSueldo.value) || 0;
+        const totalHorasMes = parseFloat(inputTotalHoras.value) || 240;
+        
+        if (sueldo === 0 || totalHorasMes === 0) {
+            liveTotalPreview.textContent = "$0.00";
+            return;
+        }
+
+        let totalAcumulado = 0;
+        const rows = tbody.querySelectorAll(".detalle-row");
+        
+        rows.forEach(row => {
+            // Ignorar filas marcadas para borrado (input tipo checkbox DELETE si es edit)
+            const deleteCheckbox = row.querySelector("input[type='checkbox'][name$='-DELETE']");
+            if (deleteCheckbox && deleteCheckbox.checked) {
+                return;
+            }
+
+            const selectTipo = row.querySelector("select[name$='-tipo_sobretiempo']");
+            const inputHoras = row.querySelector("input[name$='-numero_horas']");
+            
+            if (selectTipo && inputHoras) {
+                const tipoId = selectTipo.value;
+                const horas = parseFloat(inputHoras.value) || 0;
+                
+                const tipoObj = tiposData.find(t => t.id == tipoId);
+                const factor = tipoObj ? parseFloat(tipoObj.factor) : 0;
+                
+                if (horas > 0 && factor > 0) {
+                    const valorFila = (sueldo / totalHorasMes) * horas * factor;
+                    totalAcumulado += valorFila;
+                }
+            }
+        });
+
+        liveTotalPreview.textContent = "$" + totalAcumulado.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Vincular detectores de eventos a los inputs de una fila para recalcular al escribir/cambiar
+    function bindRowListeners(row) {
+        const selectTipo = row.querySelector("select[name$='-tipo_sobretiempo']");
+        const inputHoras = row.querySelector("input[name$='-numero_horas']");
+        const deleteCheckbox = row.querySelector("input[type='checkbox'][name$='-DELETE']");
+
+        if (selectTipo) {
+            selectTipo.addEventListener("change", recalculateLiveTotal);
+        }
+        if (inputHoras) {
+            inputHoras.addEventListener("input", recalculateLiveTotal);
+        }
+        if (deleteCheckbox) {
+            deleteCheckbox.addEventListener("change", recalculateLiveTotal);
+        }
+    }
+
+    selectEmpleado.addEventListener("change", function () {
+        const idSeleccionado = this.value;
+        const empleado = empleadosData.find(e => e.id == idSeleccionado);
+        if (empleado) {
+            inputSueldo.value = parseFloat(empleado.sueldo).toFixed(2);
+        } else {
+            inputSueldo.value = "";
+        }
+        recalculateLiveTotal();
+    });
+
+    inputSueldo.addEventListener("input", recalculateLiveTotal);
+
+    // 2. Lógica para agregar y remover filas del Django Formset dinámicamente y validaciones de UI
+    const addRowBtn = document.getElementById("add-row-btn");
+    const totalFormsInput = document.getElementById("id_detalles-TOTAL_FORMS");
+    const emptyRowTemplate = document.getElementById("empty-row-template").getElementsByTagName("tr")[0];
+
+    // Función para habilitar/deshabilitar el botón de agregar según filas activas
+    function updateAddRowButtonState() {
+        const rows = tbody.querySelectorAll(".detalle-row");
+        let activeRowCount = 0;
+        rows.forEach(row => {
+            const deleteCheckbox = row.querySelector("input[type='checkbox'][name$='-DELETE']");
+            if (!deleteCheckbox || !deleteCheckbox.checked) {
+                activeRowCount++;
+            }
+        });
+        
+        if (activeRowCount >= 1) {
+            addRowBtn.disabled = true;
+            addRowBtn.title = "Solo se permite registrar un tipo de sobretiempo por fecha.";
+            let warningSpan = document.getElementById("limit-row-warning");
+            if (!warningSpan) {
+                warningSpan = document.createElement("span");
+                warningSpan.id = "limit-row-warning";
+                warningSpan.className = "badge bg-info text-dark ms-2 align-middle";
+                warningSpan.textContent = "Límite: 1 tipo de sobretiempo";
+                addRowBtn.parentNode.appendChild(warningSpan);
+            }
+        } else {
+            addRowBtn.disabled = false;
+            addRowBtn.title = "";
+            const warningSpan = document.getElementById("limit-row-warning");
+            if (warningSpan) {
+                warningSpan.remove();
+            }
+        }
+    }
+
+    // Función para validar horas ingresadas en tiempo real
+    function validateHoursInput(input) {
+        const hours = parseFloat(input.value) || 0;
+        const feedbackId = input.id + "-feedback";
+        let feedbackEl = document.getElementById(feedbackId);
+        
+        if (hours > 4.0) {
+            input.classList.add("is-invalid");
+            if (!feedbackEl) {
+                feedbackEl = document.createElement("div");
+                feedbackEl.id = feedbackId;
+                feedbackEl.className = "invalid-feedback d-block fw-bold mt-1";
+                feedbackEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i>El límite diario es de 4 horas extras.';
+                input.parentNode.appendChild(feedbackEl);
+            }
+        } else {
+            input.classList.remove("is-invalid");
+            if (feedbackEl) {
+                feedbackEl.remove();
+            }
+        }
+    }
+
+    // Vincular detectores de eventos a los inputs de una fila para recalcular al escribir/cambiar
+    function bindRowListeners(row) {
+        const selectTipo = row.querySelector("select[name$='-tipo_sobretiempo']");
+        const inputHoras = row.querySelector("input[name$='-numero_horas']");
+        const deleteCheckbox = row.querySelector("input[type='checkbox'][name$='-DELETE']");
+
+        if (selectTipo) {
+            selectTipo.addEventListener("change", recalculateLiveTotal);
+        }
+        if (inputHoras) {
+            inputHoras.addEventListener("input", function() {
+                validateHoursInput(inputHoras);
+                recalculateLiveTotal();
+            });
+            validateHoursInput(inputHoras);
+        }
+        if (deleteCheckbox) {
+            deleteCheckbox.addEventListener("change", function() {
+                recalculateLiveTotal();
+                updateAddRowButtonState();
+            });
+        }
+    }
+
+    selectEmpleado.addEventListener("change", function () {
+        const idSeleccionado = this.value;
+        const empleado = empleadosData.find(e => e.id == idSeleccionado);
+        if (empleado) {
+            inputSueldo.value = parseFloat(empleado.sueldo).toFixed(2);
+        } else {
+            inputSueldo.value = "";
+        }
+        recalculateLiveTotal();
+    });
+
+    inputSueldo.addEventListener("input", recalculateLiveTotal);
+
+    addRowBtn.addEventListener("click", function() {
+        let currentFormCount = parseInt(totalFormsInput.value);
+        let newRow = emptyRowTemplate.cloneNode(true);
+        let htmlContent = newRow.innerHTML.replace(/__prefix__/g, currentFormCount);
+        newRow.innerHTML = htmlContent;
+        
+        const select = newRow.querySelector("select");
+        if (select) select.className = "form-select";
+        
+        const inputs = newRow.querySelectorAll("input");
+        inputs.forEach(input => {
+            if (input.type === "number") {
+                input.className = "form-control";
+            }
+        });
+        
+        tbody.appendChild(newRow);
+        totalFormsInput.value = currentFormCount + 1;
+        
+        bindRowListeners(newRow);
+        recalculateLiveTotal();
+        updateAddRowButtonState();
+
+        newRow.querySelector(".remove-row-btn").addEventListener("click", function() {
+            newRow.remove();
+            recalculateLiveTotal();
+            updateAddRowButtonState();
+        });
+    });
+
+    // Inicializar listeners en las filas existentes
+    document.querySelectorAll(".detalle-row").forEach(function(row) {
+        bindRowListeners(row);
+        
+        const removeBtn = row.querySelector(".remove-row-btn");
+        if (removeBtn) {
+            removeBtn.addEventListener("click", function() {
+                row.remove();
+                recalculateLiveTotal();
+                updateAddRowButtonState();
+            });
+        }
+    });
+
+    // Calcular el total y estados al cargar la página (útil al editar registros ya guardados)
+    recalculateLiveTotal();
+    updateAddRowButtonState();
+</script>
+{% endblock %}

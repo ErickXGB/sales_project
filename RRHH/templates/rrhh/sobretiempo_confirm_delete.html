@@ -1,0 +1,21 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}Eliminar Sobretiempo{% endblock %}
+
+{% block content %}
+<div class="card shadow border-danger mb-4">
+    <div class="card-header bg-danger text-white">
+        <h4 class="mb-0">Eliminar Registro de Sobretiempo</h4>
+    </div>
+    <div class="card-body">
+        <p class="fs-5">¿Estás seguro de que deseas eliminar el registro de sobretiempo para <strong>{{ object.empleado.nombres }}</strong> con fecha <strong>{{ object.fecha_registro }}</strong>?</p>
+        <div class="alert alert-warning">Esta acción es irreversible y eliminará todos los detalles de sobretiempo asociados a este registro.</div>
+        
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Confirmar Eliminación</button>
+            <a href="{% url 'rrhh:sobretiempo_list' %}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

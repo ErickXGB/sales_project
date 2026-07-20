@@ -1,0 +1,63 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}Detalle de Sobretiempo{% endblock %}
+
+{% block content %}
+<div class="card shadow mb-4">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Detalle de Sobretiempo #{{ sobretiempo.id }}</h4>
+        <div class="d-flex gap-2">
+            <a href="{% url 'rrhh:sobretiempo_detail_pdf' sobretiempo.id %}" class="btn btn-sm btn-danger font-weight-bold">
+                <i class="bi bi-file-pdf-fill"></i> Descargar PDF
+            </a>
+            <a href="{% url 'rrhh:sobretiempo_detail_excel' sobretiempo.id %}" class="btn btn-sm btn-success font-weight-bold">
+                <i class="bi bi-file-excel-fill"></i> Descargar Excel
+            </a>
+            <a href="{% url 'rrhh:sobretiempo_list' %}" class="btn btn-sm btn-dark">Volver</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <strong>Empleado:</strong> {{ sobretiempo.empleado.nombres }}
+            </div>
+            <div class="col-md-6">
+                <strong>Fecha de Registro:</strong> {{ sobretiempo.fecha_registro|date:"d/m/Y" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Horas Mensuales:</strong> {{ sobretiempo.total_horas }} hrs
+            </div>
+            <div class="col-md-6">
+                <strong>Sueldo Mensual:</strong> ${{ sobretiempo.sueldo_mensual }}
+            </div>
+        </div>
+
+        <div class="table-responsive mb-4">
+            <table class="table table-bordered">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Tipo de Sobretiempo</th>
+                        <th>Factor</th>
+                        <th>Número de Horas</th>
+                        <th class="text-end">Valor Calculado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in sobretiempo.detalles.all %}
+                    <tr>
+                        <td>{{ d.tipo_sobretiempo.descripcion }}</td>
+                        <td>{{ d.tipo_sobretiempo.factor }}</td>
+                        <td>{{ d.numero_horas }} hrs</td>
+                        <td class="text-end fw-bold">${{ d.valor_calculado }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-light">
+                        <td colspan="3" class="text-end fw-bold">Total Acumulado:</td>
+                        <td class="text-end fw-bold text-success" style="font-size: 1.2em;">${{ sobretiempo.total_calculado }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

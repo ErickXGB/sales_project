@@ -30,6 +30,10 @@ El código fuente del sistema está organizado en las siguientes aplicaciones y 
     *   Decoradores y Mixins personalizados para la protección de vistas (`PermissionRequiredMixin`, `LoginRequiredMixin`).
     *   Comando administrativo `setup_roles` para inicializar grupos y permisos.
 *   **`templates/`**: Directorio de plantillas globales (diseños de base, login, restauración de claves y cambio de contraseña).
+*   **`sri_microservice/`**: Microservicio autónomo desarrollado en **FastAPI** para la facturación electrónica en Ecuador:
+    *   Generación de XML estructurado de facturas según el estándar del SRI.
+    *   Firma criptográfica XAdES-BES en memoria mediante `signxml` y `cryptography` con soporte para certificados `.p12`.
+    *   Envío SOAP y consulta de autorización mediante `zeep` con los Web Services del SRI (Recepcion y Autorizacion).
 
 ---
 
@@ -62,6 +66,11 @@ El código fuente del sistema está organizado en las siguientes aplicaciones y 
 *   El nombre de usuario en la barra de navegación se transformó en un menú desplegable (dropdown).
 *   Se crearon e integraron vistas estilizadas para el **Cambio de Contraseña** de los usuarios directamente desde el sistema, con redirección y alertas de seguridad.
 
+### 6. Facturación Electrónica SRI (Ecuador)
+*   Se desarrolló un microservicio dedicado en `sri_microservice` con FastAPI.
+*   **Firma e Integración:** Cuando se guarda una factura en Django, se hace una petición POST al microservicio. El microservicio valida, estructura el XML, firma el comprobante con la firma digital `.p12` cargada localmente o enviada en base64, y realiza el envío al Web Service del SRI.
+*   **Visualización:** En el detalle de la factura se despliega la clave de acceso de 49 dígitos generada por el SRI, junto con el estado del SRI y un botón de copiado rápido al portapapeles.
+
 ---
 
 ## 🚀 Instrucciones de Configuración Inicial
@@ -79,7 +88,59 @@ El código fuente del sistema está organizado en las siguientes aplicaciones y 
     ```bash
     python manage.py setup_roles
     ```
-4.  **Iniciar Servidor de Desarrollo**:
+4.  **Iniciar Servidor de Desarrollo (Django)**:
     ```bash
     python manage.py runserver
     ```
+
+---
+
+## 🚀 Instrucciones de Configuración y Ejecución del Microservicio SRI
+
+El microservicio SRI corre de manera independiente en el puerto **8001**.
+
+1.  **Configurar Variables de Entorno del Microservicio**:
+    *   Crea o edita el archivo `sri_microservice/.env` con la configuración del certificado y el entorno de pruebas del SRI:
+        ```env
+        SRI_ENVIRONMENT=PRUEBAS
+        SRI_CERT_PATH=certs/Firma.p12
+        SRI_CERT_PASSWORD=Mamatequiero12
+        SRI_VERIFY_SSL=True
+        ```
+2.  **Colocar Firma Electrónica**:
+    *   Guarda tu firma digital autorizada por el SRI en formato `.p12` dentro de la carpeta `sri_microservice/certs/` (el archivo debe llamarse igual al configurado en `SRI_CERT_PATH`, ej. `Firma.p12`).
+3.  **Instalar Dependencias del Microservicio**:
+    ```bash
+    pip install -r sri_microservice/requirements.txt
+    ```
+4.  **Ejecutar el Microservicio (FastAPI)**:
+    ```bash
+    cd sri_microservice
+    python -m uvicorn main:app --port 8001 --reload
+    ```
+5.  **Verificación**:
+    *   Asegúrate de que el microservicio esté activo en `http://127.0.0.1:8001/`. Al crear una factura en Django, se enviará y firmará automáticamente contra el SRI de Pruebas.
+
+
+10. **Implementación de un Microservicio de Facturación Electrónica (SRI)**
+    *   **Propósito:** Externalizar la complejidad del manejo de firmas digitales y las comunicaciones SOAP con el Servicio de Rentas Internas de Ecuador (SRI) fuera del núcleo de la aplicación Django, mejorando la seguridad, escalabilidad y mantenibilidad.
+    *   **Arquitectura:** Se creó un microservicio autónomo en `sri_microservice/` desarrollado con **FastAPI**. Este servicio se ejecuta de manera independiente (`python -m uvicorn main:app --port 8001 --reload`) y expone una API REST segura.
+    *   **Integración con Django:** La aplicación principal (Django) se comunica con este microservicio mediante peticiones HTTP POST cuando un usuario crea una factura. Esta comunicación se realiza utilizando el `requests` de Python, simulando un patrón de cliente-servidor donde Django delega la tarea de facturación electrónica al microservicio especializado.
+    *   **Características Clave:**
+        *   **Firma Digital Segura:** El microservicio maneja de forma segura el certificado `.p12` del contribuyente. Utiliza la librería `signxml` para firmar los comprobantes XML en memoria, aplicando la firma criptográfica XAdES-BES que exige el SRI.
+        *   **Envío al SRI:** Una vez firmado, el XML es enviado mediante el protocolo SOAP a los Web Services oficiales del SRI (Recepcion y Autorizacion). La librería `zeep` se encarga de la comunicación SOAP y el manejo de errores.
+        *   **Validación Automática:** El microservicio realiza validaciones sintácticas y estructurales del XML antes de enviarlo, asegurando que cumpla con el esquema establecido por el SRI.
+        *   **Persistencia de Información:** Tras la respuesta del SRI, el microservicio devuelve la información relevante (Estado de Autorización, Clave de Acceso, Mensajes del SRI) a la aplicación Django, la cual se encarga de almacenar estos datos en la base de datos y mostrarlos al usuario en la interfaz.
+        *   **Configuración Flexible:** Utiliza variables de entorno (`.env`) para gestionar parámetros sensibles como la ruta del certificado, contraseña y el ambiente de destino (PRUEBAS o PRODUCCION), facilitando su despliegue en diferentes entornos sin modificar el código.
+    *   **Beneficios:**
+        *   **Seguridad Mejorada:** Mantiene las claves privadas y la lógica de firma fuera del servidor de aplicaciones web principal (Django), reduciendo la superficie de ataque.
+        *   **Aislamiento de Errores:** Un fallo en la comunicación con el SRI o un error en la firma no bloquea la aplicación principal, ya que la responsabilidad está delegada.
+        *   **Mantenibilidad:** Permite actualizar las dependencias de firma o las integraciones con el SRI sin necesidad de redeployar la aplicación Django, siempre que la interfaz de API se mantenga estable.
+        *   **Escalabilidad:** Facilita el escalado horizontal del servicio de facturación de forma independiente al resto de la aplicación.
+
+        Sobretiempo sueldo mensual del empleado dividido para 240, y luego este valor lo voy a multiplicar por las horas trabajadas en sobretiempo
+
+        dos registros, factor dos, extraordinaria y factor 1.5, ordinaria 
+        empleado, varios empleados y sueldo. fecha de sobretiempo y detalle (tipo sobre tiempo)  ElFACTOR SE MULTIPLICA POR EL TIPO DE SOBRETIEMPO
+
+sobretiempo = sueldo/240*horas*factortiposobretiempo

@@ -1,23 +1,24 @@
 {% extends 'billing/base.html' %}
 {% block title %}Inicio - Dashboard{% endblock %}
+{% block heading %}Inicio - Panel General{% endblock %}
+
 {% block content %}
 
 <!-- Header de Bienvenida -->
-<div class="card shadow-sm border-0 bg-dark text-white p-4 mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
-    <div class="d-flex justify-content-between align-items-center">
+<div class="card border-0 text-white mb-4 shadow-sm" style="background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);">
+    <div class="card-body p-4 p-md-5 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-4">
         <div>
-            <h2 class="fw-bold mb-1">¡Bienvenido, {{ user.first_name|default:user.username }}!</h2>
-            <p class="text-secondary-subtle mb-0">Sistema de Gestión de Ventas, Compras e Inventario</p>
+            <h2 class="fw-bold mb-2">¡Bienvenido de nuevo, {{ user.first_name|default:user.username }}!</h2>
+            <p class="mb-0 opacity-75 fs-5">Sistema de Gestión de Ventas, Compras y Cobranzas.</p>
         </div>
-        <div class="text-end">
-            <span class="text-muted d-block small">Roles asignados</span>
+        <div class="d-flex flex-wrap gap-2">
             {% for group in groups %}
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 ms-1">{{ group }}</span>
+                <span class="badge px-3 py-2 rounded-pill" style="background-color: rgba(255, 255, 255, 0.2) !important; color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.15) !important;">{{ group }}</span>
             {% empty %}
                 {% if user.is_superuser %}
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill px-3 py-1">Superusuario</span>
+                    <span class="badge px-3 py-2 rounded-pill" style="background-color: rgba(255, 193, 7, 0.2) !important; color: #fee75c !important; border: 1px solid rgba(255, 193, 7, 0.3) !important;">Superusuario</span>
                 {% else %}
-                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-3 py-1">Sin Rol Asignado</span>
+                    <span class="badge px-3 py-2 rounded-pill" style="background-color: rgba(220, 53, 69, 0.2) !important; color: #f87171 !important; border: 1px solid rgba(220, 53, 69, 0.3) !important;">Sin Rol Asignado</span>
                 {% endif %}
             {% endfor %}
         </div>
@@ -26,9 +27,9 @@
 
 {% if not is_admin and not is_gerente and not is_ventas and not is_compras %}
 <!-- Sin Rol Asignado -->
-<div class="alert alert-warning border-0 p-4 text-center">
-    <div class="display-1 text-warning mb-3"><i class="bi bi-shield-slash-fill"></i></div>
-    <h4>Acceso Limitado</h4>
+<div class="alert alert-warning border-0 p-4 text-center shadow-sm">
+    <div class="display-4 text-warning mb-3"><i class="bi bi-shield-slash-fill"></i></div>
+    <h4 class="fw-bold">Acceso Limitado</h4>
     <p class="mb-0 text-muted">Tu cuenta actualmente no posee ningún rol asignado en el sistema. Por favor, solicita a un Administrador que te asigne uno de los grupos de acceso:</p>
     <div class="mt-3">
         <span class="badge bg-secondary p-2 px-3 mx-1">Administrador</span>
@@ -44,61 +45,67 @@
 <!-- ========================================== -->
 {% if is_gerente or is_admin %}
 <div class="mb-5">
-    <div class="d-flex align-items-center mb-3">
-        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Panel de Gerencia y Finanzas</h4>
-        <hr class="flex-grow-1 ms-3 my-0">
+    <div class="d-flex align-items-center mb-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Panel de Gerencia y Finanzas</h5>
+        <hr class="flex-grow-1 ms-3 my-0 opacity-25">
     </div>
 
     <!-- KPIs Gerente -->
     <div class="row g-4 mb-4">
-        <!-- Ventas vs Compras -->
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm border-0 border-top border-primary border-4">
+        <!-- Ventas Totales -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 kpi-card">
                 <div class="card-body">
-                    <span class="text-muted small fw-semibold">Ventas Totales</span>
-                    <h3 class="fw-bold text-primary mt-1 mb-0">${{ total_ventas|floatformat:2 }}</h3>
-                    <small class="text-muted">Facturación activa registrada</small>
+                    <div class="kpi-icon-bg text-primary"><i class="bi bi-currency-dollar"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Ventas Totales</span>
+                    <h3 class="fw-bold text-primary mt-2 mb-1">${{ total_ventas|floatformat:2 }}</h3>
+                    <small class="text-muted d-block mt-2"><i class="bi bi-check-circle-fill text-success me-1"></i>Facturas registradas</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm border-0 border-top border-dark border-4">
+        <!-- Compras Totales -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 kpi-card">
                 <div class="card-body">
-                    <span class="text-muted small fw-semibold">Compras Totales</span>
-                    <h3 class="fw-bold text-dark mt-1 mb-0">${{ total_compras|floatformat:2 }}</h3>
-                    <small class="text-muted">Abastecimiento registrado</small>
+                    <div class="kpi-icon-bg text-danger"><i class="bi bi-cart-check-fill"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Compras Totales</span>
+                    <h3 class="fw-bold text-danger mt-2 mb-1">${{ total_compras|floatformat:2 }}</h3>
+                    <small class="text-muted d-block mt-2"><i class="bi bi-truck text-secondary me-1"></i>Abastecimiento activo</small>
                 </div>
             </div>
         </div>
-        <!-- Saldos por Cobrar vs Pagar -->
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm border-0 border-top border-warning border-4">
+        <!-- Cuentas por Cobrar -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 kpi-card">
                 <div class="card-body">
-                    <span class="text-muted small fw-semibold">Cuentas por Cobrar</span>
-                    <h3 class="fw-bold text-warning mt-1 mb-0">${{ saldo_por_cobrar|floatformat:2 }}</h3>
-                    <small class="text-muted">Saldo pendiente de clientes</small>
+                    <div class="kpi-icon-bg text-warning"><i class="bi bi-hourglass-split"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Cuentas por Cobrar</span>
+                    <h3 class="fw-bold text-warning mt-2 mb-1">${{ saldo_por_cobrar|floatformat:2 }}</h3>
+                    <small class="text-muted d-block mt-2"><i class="bi bi-people-fill text-secondary me-1"></i>Clientes a crédito</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card h-100 shadow-sm border-0 border-top border-danger border-4">
+        <!-- Cuentas por Pagar -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 kpi-card">
                 <div class="card-body">
-                    <span class="text-muted small fw-semibold">Cuentas por Pagar</span>
-                    <h3 class="fw-bold text-danger mt-1 mb-0">${{ saldo_por_pagar|floatformat:2 }}</h3>
-                    <small class="text-muted">Saldo pendiente a proveedores</small>
+                    <div class="kpi-icon-bg text-info"><i class="bi bi-wallet2"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Cuentas por Pagar</span>
+                    <h3 class="fw-bold text-info mt-2 mb-1">${{ saldo_por_pagar|floatformat:2 }}</h3>
+                    <small class="text-muted d-block mt-2"><i class="bi bi-calendar-check-fill text-secondary me-1"></i>Pendiente a proveedores</small>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Atajos Rápidos Gerente -->
-    <div class="card shadow-sm border-0 mb-4 bg-light-subtle">
-        <div class="card-body py-3">
-            <span class="fw-bold text-secondary me-3"><i class="bi bi-link-45deg me-1"></i>Atajos de Gestión:</span>
+    <div class="card shadow-sm border-0 mb-4 bg-light bg-opacity-50">
+        <div class="card-body py-3 d-flex flex-wrap align-items-center gap-3">
+            <span class="fw-bold text-secondary d-flex align-items-center gap-1"><i class="bi bi-lightning-charge-fill text-warning"></i> Atajos Rápidos:</span>
             <div class="d-inline-flex gap-2 flex-wrap">
-                <a href="{% url 'pagos:pagos_home' %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-wallet2 me-1"></i>Cobros de Clientes</a>
-                <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-journal-check me-1"></i>Pagos a Proveedores</a>
-                <a href="{% url 'billing:customer_list' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-people me-1"></i>Clientes</a>
+                <a href="{% url 'pagos:pagos_home' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-cash-stack me-1"></i>Cobros de Clientes</a>
+                <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-wallet2 me-1"></i>Pagos a Proveedores</a>
+                <a href="{% url 'billing:customer_list' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-people me-1"></i>Clientes</a>
                 <a href="{% url 'billing:supplier_list' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-truck me-1"></i>Proveedores</a>
             </div>
         </div>
@@ -110,62 +117,61 @@
 <!-- ========================================== -->
 <!-- 2. DASHBOARD DE VENTAS -->
 <!-- ========================================== -->
-{% if is_ventas %}
+{% if is_ventas or is_admin or is_gerente %}
 <div class="mb-5">
-    <div class="d-flex align-items-center mb-3">
-        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-cart-fill me-2 text-success"></i>Módulo de Ventas y Clientes</h4>
-        <hr class="flex-grow-1 ms-3 my-0">
+    <div class="d-flex align-items-center mb-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-cart-fill me-2 text-success"></i>Módulo de Ventas y Clientes</h5>
+        <hr class="flex-grow-1 ms-3 my-0 opacity-25">
     </div>
 
     <!-- KPIs Ventas -->
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
-            <div class="card shadow-sm border-0 border-start border-success border-4">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="text-muted small fw-semibold">Clientes Activos</span>
-                        <h4 class="fw-bold text-success mb-0">{{ total_customers }}</h4>
-                    </div>
-                    <div class="fs-2 text-success-subtle"><i class="bi bi-people-fill"></i></div>
+            <div class="card shadow-sm h-100 kpi-card">
+                <div class="card-body">
+                    <div class="kpi-icon-bg text-success"><i class="bi bi-people-fill"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Clientes Activos</span>
+                    <h3 class="fw-bold text-success mt-2 mb-0">{{ total_customers }}</h3>
+                    <small class="text-muted d-block mt-2">Cartera de clientes</small>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
-            <div class="card shadow-sm border-0 border-start border-primary border-4">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="text-muted small fw-semibold">Facturas Generadas</span>
-                        <h4 class="fw-bold text-primary mb-0">{{ total_invoices_sales }}</h4>
-                    </div>
-                    <div class="fs-2 text-primary-subtle"><i class="bi bi-file-earmark-spreadsheet-fill"></i></div>
+            <div class="card shadow-sm h-100 kpi-card">
+                <div class="card-body">
+                    <div class="kpi-icon-bg text-primary"><i class="bi bi-file-earmark-spreadsheet-fill"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Facturas Generadas</span>
+                    <h3 class="fw-bold text-primary mt-2 mb-0">{{ total_invoices_sales }}</h3>
+                    <small class="text-muted d-block mt-2">Comprobantes emitidos</small>
                 </div>
             </div>
         </div>
         <div class="col-md-12 col-lg-6">
-            <div class="card shadow-sm border-0 bg-success text-white">
-                <div class="card-body d-flex justify-content-between align-items-center py-3">
+            <div class="card shadow-sm border-0 bg-success text-white h-100">
+                <div class="card-body d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
                     <div>
                         <h5 class="fw-bold mb-1"><i class="bi bi-plus-circle-fill me-2"></i>Facturación Rápida</h5>
-                        <p class="mb-0 small text-white-50">Genera una nueva venta y emite el comprobante de inmediato.</p>
+                        <p class="mb-0 small opacity-90">Genera una nueva venta y emite el comprobante de inmediato.</p>
                     </div>
-                    <a href="{% url 'billing:invoice_create' %}" class="btn btn-light fw-bold text-success">Crear Factura</a>
+                    <a href="{% url 'billing:invoice_create' %}" class="btn btn-light fw-bold text-success px-4 py-2">Crear Factura</a>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Tablas Ventas -->
-    <div class="row">
+    <div class="row g-4">
         <!-- Facturas Recientes -->
         <div class="col-md-6">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-light border-0 py-3">
-                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-receipt me-2 text-primary"></i>Facturas Recientes</h6>
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-receipt me-2 text-primary"></i>Facturas Recientes</h6>
+                    <a href="{% url 'billing:invoice_list' %}" class="btn btn-sm btn-link text-decoration-none">Ver todas</a>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead class="table-light">
+                <div class="card-body p-0">
+                    <div class="table-responsive border-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Nº</th>
                                     <th>Cliente</th>
@@ -176,16 +182,16 @@
                             <tbody>
                                 {% for inv in recent_invoices %}
                                 <tr>
-                                    <td><span class="fw-bold">{{ inv.numero|default:inv.id }}</span></td>
+                                    <td><span class="fw-bold text-primary">{{ inv.numero|default:inv.id }}</span></td>
                                     <td>{{ inv.customer.full_name }}</td>
-                                    <td class="fw-semibold">${{ inv.total }}</td>
+                                    <td class="fw-bold text-success">${{ inv.total }}</td>
                                     <td class="text-center">
-                                        <a href="{% url 'billing:invoice_detail' inv.id %}" class="btn btn-sm btn-outline-info py-0">Ver</a>
+                                        <a href="{% url 'billing:invoice_detail' inv.id %}" class="btn btn-sm btn-outline-info py-1 px-3">Ver</a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted">No se registran facturas recientes.</td>
+                                    <td colspan="4" class="text-center text-muted py-4">No se registran facturas recientes.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -197,18 +203,19 @@
 
         <!-- Cuentas por Cobrar Pendientes -->
         <div class="col-md-6">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-light border-0 py-3">
-                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-hourglass-split me-2 text-warning"></i>Facturas con Saldo Pendiente</h6>
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-hourglass-split me-2 text-warning"></i>Facturas con Saldo Pendiente</h6>
+                    <a href="{% url 'pagos:facturas_pendientes' %}" class="btn btn-sm btn-link text-decoration-none text-warning">Cobrar todo</a>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm mb-0">
-                            <thead class="table-light">
+                <div class="card-body p-0">
+                    <div class="table-responsive border-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Nº</th>
                                     <th>Cliente</th>
-                                    <th class="text-end text-danger">Saldo</th>
+                                    <th class="text-end">Saldo</th>
                                     <th class="text-center">Cobrar</th>
                                 </tr>
                             </thead>
@@ -217,14 +224,14 @@
                                 <tr>
                                     <td><span class="fw-bold text-primary">{{ inv.numero|default:inv.id }}</span></td>
                                     <td>{{ inv.customer.full_name }}</td>
-                                    <td class="text-end fw-semibold text-danger">${{ inv.saldo }}</td>
+                                    <td class="text-end fw-bold text-danger">${{ inv.saldo }}</td>
                                     <td class="text-center">
-                                        <a href="{% url 'pagos:registrar_pago' inv.id %}" class="btn btn-sm btn-success py-0">Cobrar</a>
+                                        <a href="{% url 'pagos:registrar_pago' inv.id %}" class="btn btn-sm btn-success py-1 px-3">Cobrar</a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted">No hay cobros pendientes de cobro.</td>
+                                    <td colspan="4" class="text-center text-muted py-4">No hay cobros pendientes de cobro.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -241,64 +248,63 @@
 <!-- ========================================== -->
 <!-- 3. DASHBOARD DE COMPRAS -->
 <!-- ========================================== -->
-{% if is_compras %}
+{% if is_compras or is_admin or is_gerente %}
 <div class="mb-5">
-    <div class="d-flex align-items-center mb-3">
-        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-truck me-2 text-danger"></i>Módulo de Compras y Abastecimiento</h4>
-        <hr class="flex-grow-1 ms-3 my-0">
+    <div class="d-flex align-items-center mb-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-truck me-2 text-danger"></i>Módulo de Compras y Abastecimiento</h5>
+        <hr class="flex-grow-1 ms-3 my-0 opacity-25">
     </div>
 
     <!-- KPIs Compras -->
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
-            <div class="card shadow-sm border-0 border-start border-danger border-4">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="text-muted small fw-semibold">Proveedores</span>
-                        <h4 class="fw-bold text-danger mb-0">{{ total_suppliers }}</h4>
-                    </div>
-                    <div class="fs-2 text-danger-subtle"><i class="bi bi-truck"></i></div>
+            <div class="card shadow-sm h-100 kpi-card">
+                <div class="card-body">
+                    <div class="kpi-icon-bg text-danger"><i class="bi bi-building-fill-check"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Proveedores</span>
+                    <h3 class="fw-bold text-danger mb-0">{{ total_suppliers }}</h3>
+                    <small class="text-muted d-block mt-2">Fabricantes y distribuidores</small>
                 </div>
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
-            <div class="card shadow-sm border-0 border-start border-warning border-4">
-                <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="text-muted small fw-semibold">Bajo Stock</span>
-                        <h4 class="fw-bold text-warning mb-0">
-                            {% if low_stock %}{{ low_stock|length }}{% else %}0{% endif %} Productos
-                        </h4>
-                    </div>
-                    <div class="fs-2 text-warning-subtle"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div class="card shadow-sm h-100 kpi-card">
+                <div class="card-body">
+                    <div class="kpi-icon-bg text-warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                    <span class="text-muted small fw-bold text-uppercase">Bajo Stock</span>
+                    <h3 class="fw-bold text-warning mb-0">
+                        {% if low_stock %}{{ low_stock|length }}{% else %}0{% endif %} Productos
+                    </h3>
+                    <small class="text-muted d-block mt-2">Necesitan reposición</small>
                 </div>
             </div>
         </div>
         <div class="col-md-12 col-lg-6">
-            <div class="card shadow-sm border-0 bg-danger text-white">
-                <div class="card-body d-flex justify-content-between align-items-center py-3">
+            <div class="card shadow-sm border-0 bg-danger text-white h-100">
+                <div class="card-body d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
                     <div>
                         <h5 class="fw-bold mb-1"><i class="bi bi-plus-circle-fill me-2"></i>Registrar Compra</h5>
-                        <p class="mb-0 small text-white-50">Abastece el stock del inventario registrando facturas de proveedores.</p>
+                        <p class="mb-0 small opacity-90">Abastece el stock del inventario registrando facturas de proveedores.</p>
                     </div>
-                    <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-light fw-bold text-danger">Nueva Compra</a>
+                    <a href="{% url 'purchasing:purchase_create' %}" class="btn btn-light fw-bold text-danger px-4 py-2">Nueva Compra</a>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Tablas Compras -->
-    <div class="row">
+    <div class="row g-4">
         <!-- Productos con bajo stock -->
         <div class="col-md-6">
-            <div class="card shadow-sm border-0 border-start border-warning border-3 mb-4">
-                <div class="card-header bg-light border-0 py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="card-title mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle me-2"></i>Alertas de Reposición de Inventario</h6>
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold text-warning-emphasis"><i class="bi bi-exclamation-triangle-fill me-2"></i>Alertas de Reposición de Inventario</h6>
+                    <span class="badge bg-warning-subtle text-warning">Prioridad alta</span>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle mb-0">
-                            <thead class="table-light">
+                <div class="card-body p-0">
+                    <div class="table-responsive border-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Producto</th>
                                     <th>Marca</th>
@@ -308,13 +314,13 @@
                             <tbody>
                                 {% for p in low_stock %}
                                 <tr>
-                                    <td><span class="fw-semibold">{{ p.name }}</span></td>
+                                    <td><span class="fw-bold">{{ p.name }}</span></td>
                                     <td>{{ p.brand.name }}</td>
-                                    <td class="text-center"><span class="badge bg-danger">{{ p.stock }}</span></td>
+                                    <td class="text-center"><span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">{{ p.stock }}</span></td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="3" class="text-center text-success py-2">Todo el inventario está correctamente abastecido.</td>
+                                    <td colspan="3" class="text-center text-success py-4">Todo el inventario está correctamente abastecido.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -326,18 +332,19 @@
 
         <!-- Cuentas por Pagar (Compras a Crédito Pendientes) -->
         <div class="col-md-6">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-light border-0 py-3">
-                    <h6 class="card-title mb-0 fw-bold"><i class="bi bi-wallet2 me-2 text-danger"></i>Compras Pendientes de Liquidar</h6>
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-wallet2 me-2 text-danger"></i>Compras Pendientes de Liquidar</h6>
+                    <a href="{% url 'pagos:pagos_compras_home' %}" class="btn btn-sm btn-link text-decoration-none text-danger">Pagar todo</a>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover table-sm align-middle mb-0">
-                            <thead class="table-light">
+                <div class="card-body p-0">
+                    <div class="table-responsive border-0">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Factura Prov.</th>
                                     <th>Proveedor</th>
-                                    <th class="text-end text-danger">Saldo</th>
+                                    <th class="text-end">Saldo</th>
                                     <th class="text-center">Pagar</th>
                                 </tr>
                             </thead>
@@ -346,14 +353,14 @@
                                 <tr>
                                     <td><span class="fw-bold">{{ comp.document_number }}</span></td>
                                     <td>{{ comp.supplier.name }}</td>
-                                    <td class="text-end fw-semibold text-danger">${{ comp.saldo }}</td>
+                                    <td class="text-end fw-bold text-danger">${{ comp.saldo }}</td>
                                     <td class="text-center">
-                                        <a href="{% url 'pagos:registrar_pago_compra' comp.id %}" class="btn btn-sm btn-outline-success py-0">Abonar</a>
+                                        <a href="{% url 'pagos:registrar_pago_compra' comp.id %}" class="btn btn-sm btn-outline-success py-1 px-3">Abonar</a>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-2">No hay pagos a crédito pendientes.</td>
+                                    <td colspan="4" class="text-center text-muted py-4">No hay pagos a crédito pendientes.</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -372,40 +379,40 @@
 <!-- ========================================== -->
 {% if is_admin %}
 <div class="mb-5">
-    <div class="d-flex align-items-center mb-3">
-        <h4 class="fw-bold text-dark mb-0"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Panel de Control del Administrador</h4>
-        <hr class="flex-grow-1 ms-3 my-0">
+    <div class="d-flex align-items-center mb-4">
+        <h5 class="fw-bold mb-0"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Panel de Control del Administrador</h5>
+        <hr class="flex-grow-1 ms-3 my-0 opacity-25">
     </div>
 
     <!-- KPIs Admin -->
     <div class="row g-4 mb-4">
         <div class="col-md-4">
-            <div class="card shadow-sm border-0 text-center py-3">
-                <div class="display-5 text-primary"><i class="bi bi-people"></i></div>
-                <h3 class="fw-bold text-dark mt-2 mb-0">{{ total_users }}</h3>
+            <div class="card shadow-sm text-center py-4">
+                <div class="display-6 text-primary"><i class="bi bi-people-fill"></i></div>
+                <h3 class="fw-bold mt-3 mb-1">{{ total_users }}</h3>
                 <span class="text-muted small">Usuarios Registrados</span>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card shadow-sm border-0 text-center py-3">
-                <div class="display-5 text-warning"><i class="bi bi-exclamation-circle"></i></div>
-                <h3 class="fw-bold text-dark mt-2 mb-0">{{ low_stock_count }}</h3>
+            <div class="card shadow-sm text-center py-4">
+                <div class="display-6 text-warning"><i class="bi bi-exclamation-circle-fill"></i></div>
+                <h3 class="fw-bold mt-3 mb-1">{{ low_stock_count }}</h3>
                 <span class="text-muted small">Productos en Alerta de Stock</span>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card shadow-sm border-0 text-center py-3">
-                <div class="display-5 text-success"><i class="bi bi-file-earmark-text"></i></div>
-                <h3 class="fw-bold text-dark mt-2 mb-0">{{ total_invoices }} / {{ total_purchases }}</h3>
+            <div class="card shadow-sm text-center py-4">
+                <div class="display-6 text-success"><i class="bi bi-file-earmark-text-fill"></i></div>
+                <h3 class="fw-bold mt-3 mb-1">{{ total_invoices }} / {{ total_purchases }}</h3>
                 <span class="text-muted small">Facturas / Compras registradas</span>
             </div>
         </div>
     </div>
 
     <!-- Atajos Rápidos Admin -->
-    <div class="card shadow-sm border-0 mb-4 bg-light-subtle">
-        <div class="card-body py-3">
-            <span class="fw-bold text-secondary me-3"><i class="bi bi-shield-check me-1"></i>Acciones de Seguridad:</span>
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body py-3 d-flex flex-wrap align-items-center gap-3">
+            <span class="fw-bold text-secondary me-2"><i class="bi bi-shield-check-fill me-1"></i>Acciones de Seguridad:</span>
             <div class="d-inline-flex gap-2 flex-wrap">
                 <a href="{% url 'security:security_home' %}" class="btn btn-sm btn-primary"><i class="bi bi-speedometer2 me-1"></i>Panel de Control de Seguridad</a>
                 <a href="{% url 'security:user_list' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-person-gear me-1"></i>Gestionar Usuarios</a>

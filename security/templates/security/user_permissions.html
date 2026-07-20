@@ -1,0 +1,264 @@
+{% extends 'billing/base.html' %}
+{% block title %}Permisos del Usuario: {{ target_user.username }}{% endblock %}
+{% block content %}
+
+{% csrf_token %}
+
+<style>
+    .matrix-switch {
+        width: 2.5em !important;
+        height: 1.25em !important;
+        cursor: pointer;
+        transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .matrix-switch:focus {
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15) !important;
+    }
+    .matrix-switch:checked {
+        background-color: #06d6a0 !important;
+        border-color: #06d6a0 !important;
+        transform: scale(1.08);
+    }
+    .matrix-switch:disabled:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    .perm-card {
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.08);
+        background: #ffffff;
+    }
+    .matrix-table th {
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        vertical-align: middle;
+        padding: 12px 10px !important;
+    }
+    .matrix-table td {
+        vertical-align: middle;
+        padding: 14px 10px !important;
+    }
+    .badge-role {
+        font-weight: 600;
+        font-size: 0.72rem;
+        padding: 5px 10px;
+        border-radius: 30px;
+    }
+    .cell-disabled {
+        background-color: #fafbfc !important;
+        color: #ccc;
+    }
+    .model-row {
+        transition: background-color 0.2s ease;
+    }
+    .model-row:hover {
+        background-color: rgba(0,0,0,0.01) !important;
+    }
+    /* Fixed column headers */
+    .sticky-col {
+        position: sticky;
+        left: 0;
+        background-color: #ffffff;
+        z-index: 5;
+        border-right: 2px solid rgba(0,0,0,0.1) !important;
+        box-shadow: 4px 0 8px rgba(0,0,0,0.02);
+    }
+    .model-row:hover .sticky-col {
+        background-color: #fcfdfe;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Permisos Personalizados</h2>
+        <p class="text-muted mb-0">Asigna o retira permisos directos sobreescribiendo los de su rol de manera segura.</p>
+    </div>
+    <a href="{% url 'security:user_list' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Listado</a>
+</div>
+
+<!-- Ficha de Información del Usuario -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4 bg-light rounded-3">
+        <div class="row align-items-center">
+            <div class="col-md-auto mb-3 mb-md-0">
+                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                    <i class="bi bi-person-fill fs-2"></i>
+                </div>
+            </div>
+            <div class="col-md">
+                <h4 class="fw-bold mb-1 text-dark">{{ target_user.first_name }} {{ target_user.last_name }}</h4>
+                <div class="text-muted small d-flex flex-wrap gap-3">
+                    <span><i class="bi bi-person-badge-fill me-1"></i>Usuario: <strong>{{ target_user.username }}</strong></span>
+                    <span><i class="bi bi-envelope-fill me-1"></i>Email: <strong>{{ target_user.email|default:"-" }}</strong></span>
+                    <span><i class="bi bi-shield-fill-check me-1"></i>Roles heredados: 
+                        {% for group in target_user.groups.all %}
+                            <span class="badge bg-primary badge-role text-white">{{ group.name }}</span>
+                        {% empty %}
+                            <span class="badge bg-secondary badge-role text-white">Ninguno (Acceso Limitado)</span>
+                        {% endfor %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leyenda -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-3 bg-light rounded-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-center gap-4 text-secondary small">
+            <span class="fw-semibold text-dark"><i class="bi bi-info-circle me-1"></i>Guía visual:</span>
+            <span><div class="form-check form-switch d-inline-block me-1"><input class="form-check-input matrix-switch" type="checkbox" checked disabled style="opacity: 0.6;"></div> Heredado del Rol (Solo Lectura)</span>
+            <span><div class="form-check form-switch d-inline-block me-1"><input class="form-check-input matrix-switch" type="checkbox" checked readonly style="background-color: #06d6a0; border-color: #06d6a0;"></div> Asignado Directo (Interactivo)</span>
+            <span><div class="form-check form-switch d-inline-block me-1"><input class="form-check-input matrix-switch" type="checkbox" disabled></div> Sin Asignar (Interactivo)</span>
+            <span><span class="fw-bold text-muted me-1">-</span> No Aplica</span>
+        </div>
+    </div>
+</div>
+
+<!-- Matriz de Permisos Individual -->
+<div class="card border-0 perm-card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered matrix-table mb-0 align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="sticky-col text-center" style="min-width: 200px;">Módulo / Sección</th>
+                        {% for action in actions %}
+                        <th class="text-center py-2" style="min-width: 80px;">{{ action.label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for model in models_config %}
+                    <tr class="model-row">
+                        <td class="sticky-col fw-bold text-dark">{{ model.label }}</td>
+                        
+                        {% for action in actions %}
+                            {% if action.suffix == 'download_pdf' %}
+                                {% with codename="download_"|add:model.codename_base|add:"_pdf" %}
+                                <td class="text-center border-start border-end {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                    {% if codename in db_permissions %}
+                                        {% if codename in inherited_perms %}
+                                            <div class="form-check form-switch d-inline-block" title="Permiso heredado del rol (Solo lectura)">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch" checked disabled>
+                                            </div>
+                                        {% else %}
+                                            <div class="form-check form-switch d-inline-block" title="Habilitar/Deshabilitar permiso directo">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                    data-user-id="{{ target_user.id }}"
+                                                    data-codename="{{ codename }}"
+                                                    {% if codename in direct_perms %}checked{% endif %}
+                                                    onclick="toggleUserPermission(this)">
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                {% endwith %}
+                            {% elif action.suffix == 'download_excel' %}
+                                {% with codename="download_"|add:model.codename_base|add:"_excel" %}
+                                <td class="text-center border-start border-end {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                    {% if codename in db_permissions %}
+                                        {% if codename in inherited_perms %}
+                                            <div class="form-check form-switch d-inline-block" title="Permiso heredado del rol (Solo lectura)">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch" checked disabled>
+                                            </div>
+                                        {% else %}
+                                            <div class="form-check form-switch d-inline-block" title="Habilitar/Deshabilitar permiso directo">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                    data-user-id="{{ target_user.id }}"
+                                                    data-codename="{{ codename }}"
+                                                    {% if codename in direct_perms %}checked{% endif %}
+                                                    onclick="toggleUserPermission(this)">
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                {% endwith %}
+                            {% else %}
+                                {% with codename=action.suffix|add:"_"|add:model.codename_base %}
+                                <td class="text-center border-start border-end {% if codename not in db_permissions %}cell-disabled{% endif %}">
+                                    {% if codename in db_permissions %}
+                                        {% if codename in inherited_perms %}
+                                            <div class="form-check form-switch d-inline-block" title="Permiso heredado del rol (Solo lectura)">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch" checked disabled>
+                                            </div>
+                                        {% else %}
+                                            <div class="form-check form-switch d-inline-block" title="Habilitar/Deshabilitar permiso directo">
+                                                <input class="form-check-input matrix-switch" type="checkbox" role="switch"
+                                                    data-user-id="{{ target_user.id }}"
+                                                    data-codename="{{ codename }}"
+                                                    {% if codename in direct_perms %}checked{% endif %}
+                                                    onclick="toggleUserPermission(this)">
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleUserPermission(element) {
+        const userId = element.getAttribute('data-user-id');
+        const codename = element.getAttribute('data-codename');
+        const state = element.checked;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        // Deshabilitar temporalmente para evitar doble clic
+        element.disabled = true;
+
+        fetch('{% url "security:update_user_permission" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                codename: codename,
+                state: state
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Error al actualizar los permisos del usuario');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success) {
+                element.checked = !state;
+                alert('No se pudo guardar la configuración: ' + (data.error || 'Error desconocido'));
+            }
+        })
+        .catch(error => {
+            element.checked = !state;
+            alert('Error de red o servidor.');
+            console.error(error);
+        })
+        .finally(() => {
+            element.disabled = false;
+        });
+    }
+</script>
+
+{% endblock %}

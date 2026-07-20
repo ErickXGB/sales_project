@@ -50,4 +50,5 @@ urlpatterns = [
     path('invoices/<int:pk>/paypal/checkout/', views.invoice_paypal_checkout, name='invoice_paypal_checkout'),
     path('invoices/<int:pk>/paypal/capture/', views.invoice_paypal_capture, name='invoice_paypal_capture'),
     path('invoices/<int:pk>/delete/', views.InvoiceDeleteView.as_view(), name='invoice_delete'),
+    path('profile/edit/', views.profile_edit, name='profile_edit'),
 ]

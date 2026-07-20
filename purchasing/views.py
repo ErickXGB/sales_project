@@ -266,7 +266,7 @@ def _render_form_with_errors(request, supplier_select, supplier_name, supplier_c
     })
 
 @login_required
-@permission_required('purchasing.view_purchase')
+@permission_required('purchasing.detail_purchase')
 def purchase_detail(request, pk):
     """Detalle de una compra con prefetch_related('details__product')."""
     purchase = get_object_or_404(
@@ -348,7 +348,7 @@ def get_numbered_canvas_class(title):
 
 # === REPORTES DE COMPRAS (Excel / PDF) ===
 @login_required
-@permission_required('purchasing.view_purchase')
+@permission_required('purchasing.download_purchase_excel')
 def purchase_report_excel(request):
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -444,7 +444,7 @@ def purchase_report_excel(request):
 
 
 @login_required
-@permission_required('purchasing.view_purchase')
+@permission_required('purchasing.download_purchase_pdf')
 def purchase_report_pdf(request):
     import io
     import datetime
@@ -705,7 +705,7 @@ def generate_purchase_pdf_data(purchase):
 
 
 @login_required
-@permission_required('purchasing.view_purchase')
+@permission_required('purchasing.download_purchase_pdf')
 def purchase_pdf(request, pk):
     from django.http import HttpResponse
     purchase = get_object_or_404(Purchase, pk=pk)

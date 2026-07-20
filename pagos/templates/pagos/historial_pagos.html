@@ -4,18 +4,35 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2>{{ title }}</h2>
   <div class="d-flex gap-2">
-    {% if invoice %}
-    {% if invoice.estado != 'PAGADA' %}
+    {% if invoice and invoice.estado != 'PAGADA' and perms.pagos.add_cobrofactura %}
     <a href="{% url 'pagos:registrar_pago' invoice.id %}" class="btn btn-success">
       <i class="bi bi-plus-circle me-1"></i>Registrar Abono
     </a>
     {% endif %}
-    {% endif %}
   </div>
 </div>
 
-<div class="mb-3 d-flex gap-2">
-  <a href="{% url 'pagos:pagos_home' %}" class="btn btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al Panel</a>
+<!-- Buscador y Acciones (Alineados) -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+  {% if not invoice %}
+  <form method="get" class="m-0 flex-grow-1" style="max-width: 600px;">
+    <div class="input-group shadow-sm">
+      <span class="input-group-text bg-light text-secondary"><i class="bi bi-search"></i></span>
+      <input type="text" name="search_value" class="form-control border-secondary-subtle"
+        placeholder="Buscar por Nº factura, cliente u observaciones..." value="{{ search_value|default:'' }}">
+      <button type="submit" class="btn btn-primary">Buscar</button>
+      <a href="{% url 'pagos:historial_pagos' %}" class="btn btn-outline-secondary">Limpiar</a>
+    </div>
+  </form>
+  {% else %}
+  <div class="flex-grow-1"></div>
+  {% endif %}
+
+  <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+    <a href="{% url 'pagos:pagos_home' %}" class="btn btn-action-back d-flex align-items-center gap-2 fw-semibold">
+      <i class="bi bi-arrow-left"></i> Volver al Panel
+    </a>
+  </div>
 </div>
 
 {% if invoice %}
@@ -52,17 +69,6 @@
     </div>
   </div>
 </div>
-{% else %}
-<!-- Buscador de pagos global -->
-<form method="get" class="mb-4">
-  <div class="input-group shadow-sm" style="max-width: 600px;">
-    <span class="input-group-text bg-light text-secondary"><i class="bi bi-search"></i></span>
-    <input type="text" name="search_value" class="form-control border-secondary-subtle"
-      placeholder="Buscar por Nº factura, cliente u observaciones..." value="{{ search_value|default:'' }}">
-    <button type="submit" class="btn btn-primary">Buscar</button>
-    <a href="{% url 'pagos:historial_pagos' %}" class="btn btn-outline-secondary">Limpiar</a>
-  </div>
-</form>
 {% endif %}
 
 <div class="card shadow-sm">
@@ -93,18 +99,22 @@
           <td class="text-end fw-bold text-success">${{ payment.valor }}</td>
           <td>{{ payment.observacion|default:"-" }}</td>
           <td class="text-center">
+            {% if perms.pagos.change_cobrofactura %}
             <a href="{% url 'pagos:editar_pago' payment.id %}" class="btn btn-sm btn-warning" title="Editar Pago">
               <i class="bi bi-pencil-square"></i> Editar
             </a>
-            {% if payment.factura.estado == 'PAGADA' %}
-            <button class="btn btn-sm btn-outline-danger" disabled
-              title="No se puede eliminar un pago de una factura totalmente pagada">
-              <i class="bi bi-trash"></i> Eliminar
-            </button>
-            {% else %}
-            <a href="{% url 'pagos:eliminar_pago' payment.id %}" class="btn btn-sm btn-danger" title="Eliminar Pago">
-              <i class="bi bi-trash"></i> Eliminar
-            </a>
+            {% endif %}
+            {% if perms.pagos.delete_cobrofactura %}
+              {% if payment.factura.estado == 'PAGADA' %}
+              <button class="btn btn-sm btn-outline-danger" disabled
+                title="No se puede eliminar un pago de una factura totalmente pagada">
+                <i class="bi bi-trash"></i> Eliminar
+              </button>
+              {% else %}
+              <a href="{% url 'pagos:eliminar_pago' payment.id %}" class="btn btn-sm btn-danger" title="Eliminar Pago">
+                <i class="bi bi-trash"></i> Eliminar
+              </a>
+              {% endif %}
             {% endif %}
           </td>
         </tr>
@@ -118,4 +128,5 @@
     </table>
   </div>
 </div>
+{% include 'shared/pagination.html' %}
 {% endblock %}
