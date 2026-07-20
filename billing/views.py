@@ -902,6 +902,9 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             saldo = Decimal('0.00')
                             estado = 'PAGADA'
 
+                        while Invoice.objects.filter(numero=f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{str(empresa.secuencial_factura).zfill(9)}").exists():
+                            empresa.secuencial_factura += 1
+
                         secuencial_factura_generada = str(empresa.secuencial_factura).zfill(9)
                         empresa.secuencial_factura += 1
                         empresa.save(update_fields=['secuencial_factura'])
@@ -1182,6 +1185,9 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     tipo_pago = 'CONTADO'
                     saldo = Decimal('0.00')
                     estado = 'PAGADA'
+
+                while Invoice.objects.filter(numero=f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{str(empresa.secuencial_factura).zfill(9)}").exists():
+                    empresa.secuencial_factura += 1
 
                 secuencial_factura_generada = str(empresa.secuencial_factura).zfill(9)
                 empresa.secuencial_factura += 1
