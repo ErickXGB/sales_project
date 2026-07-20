@@ -976,11 +976,14 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                             "message": f"Factura enviada automáticamente al correo: {local_customer.email}"
                         }) + "\n"
                     except Exception as mail_err:
-                        messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {str(mail_err)}")
+                        err_str = str(mail_err)
+                        if "530" in err_str or "Authentication" in err_str:
+                            err_str = "No se han configurado credenciales de correo en Vercel (Configura EMAIL_HOST_USER y EMAIL_HOST_PASSWORD en Vercel Settings)."
+                        messages.warning(request, f"La factura fue guardada, pero no pudo ser enviada por correo: {err_str}")
                         yield json.dumps({
                             "step": "email_send", 
                             "status": "warning", 
-                            "message": f"Fallo al enviar correo: {str(mail_err)}"
+                            "message": f"Fallo al enviar correo: {err_str}"
                         }) + "\n"
                 else:
                     yield json.dumps({
