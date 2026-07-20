@@ -10,8 +10,11 @@ from django.db.models import Sum, Count
 from shared.mixins import PermissionRequiredMixin
 from shared.decorators import permission_required
 
-from .models import Sobretiempo, Empleado, TipoSobretiempo
-from .forms import SobretiempoForm, SobretiempoDetalleFormSet
+from decimal import Decimal
+
+from .models import Sobretiempo, Empleado, TipoSobretiempo, Prestamo, PrestamoDetalle, TipoPrestamo
+from .forms import SobretiempoForm, SobretiempoDetalleFormSet, PrestamoForm, PrestamoDetalleFormSet
+
 
 class SobretiempoListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'RRHH.view_sobretiempo'
@@ -463,3 +466,429 @@ def export_sobretiempo_detail_excel(request, pk):
     response["Content-Disposition"] = f'attachment; filename="sobretiempo_{sobretiempo.id}.xlsx"'
     wb.save(response)
     return response
+
+
+# ==========================================
+# VISTAS DE GESTIÓN DE PRÉSTAMOS
+# ==========================================
+
+class PrestamoListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'RRHH.view_prestamo'
+    model = Prestamo
+    template_name = 'rrhh/prestamo_list.html'
+    context_object_name = 'prestamos'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        totales = Prestamo.objects.aggregate(
+            total_monto=Sum('monto'),
+            total_pagar=Sum('monto_pagar'),
+            total_saldo=Sum('saldo'),
+            total_registros=Count('id')
+        )
+        context['total_monto'] = totales['total_monto'] or 0
+        context['total_pagar'] = totales['total_pagar'] or 0
+        context['total_saldo'] = totales['total_saldo'] or 0
+        context['total_registros'] = totales['total_registros'] or 0
+        return context
+
+
+class PrestamoDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    permission_required = 'RRHH.detail_prestamo'
+    model = Prestamo
+    template_name = 'rrhh/prestamo_detail.html'
+    context_object_name = 'prestamo'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        proxima = self.object.detalles.filter(saldo_cuota__gt=Decimal('0.00')).order_by('numero_cuota').first()
+        context['proxima_cuota_id'] = proxima.id if proxima else None
+        return context
+
+
+@permission_required('RRHH.change_prestamo')
+def pagar_cuota_prestamo(request, cuota_id):
+    from django.shortcuts import get_object_or_404
+    cuota = get_object_or_404(PrestamoDetalle, pk=cuota_id)
+    
+    # Validar que no se puedan pagar cuotas futuras si hay cuotas anteriores pendientes
+    cuota_ant_pendiente = cuota.prestamo.detalles.filter(
+        numero_cuota__lt=cuota.numero_cuota,
+        saldo_cuota__gt=Decimal('0.00')
+    ).order_by('numero_cuota').first()
+
+    if cuota_ant_pendiente:
+        messages.error(
+            request,
+            f"No puede pagar la cuota #{cuota.numero_cuota} sin haber pagado previamente la cuota #{cuota_ant_pendiente.numero_cuota}."
+        )
+        return redirect('rrhh:prestamo_detail', pk=cuota.prestamo.id)
+
+    cuota.saldo_cuota = Decimal('0.00')
+    cuota.save()
+    messages.success(request, f"La cuota #{cuota.numero_cuota} del préstamo #{cuota.prestamo.id} ha sido marcada como pagada.")
+    return redirect('rrhh:prestamo_detail', pk=cuota.prestamo.id)
+
+
+
+class PrestamoCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'RRHH.add_prestamo'
+    model = Prestamo
+    form_class = PrestamoForm
+    template_name = 'rrhh/prestamo_form.html'
+    success_url = reverse_lazy('rrhh:prestamo_list')
+
+    def get_context_data(self, **kwargs):
+        data = super().get_context_data(**kwargs)
+        data['tipos_prestamo_json'] = [
+            {'id': t.id, 'descripcion': t.descripcion, 'tasa_interes': t.tasa_interes}
+            for t in TipoPrestamo.objects.all()
+        ]
+        if 'detalles' in kwargs:
+            data['detalles'] = kwargs['detalles']
+        elif self.request.POST:
+            instance = getattr(self, 'object', None)
+            data['detalles'] = PrestamoDetalleFormSet(self.request.POST, instance=instance)
+        else:
+            instance = getattr(self, 'object', None)
+            data['detalles'] = PrestamoDetalleFormSet(instance=instance)
+        return data
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        detalles = context['detalles']
+
+        with transaction.atomic():
+            self.object = form.save()
+            if detalles.is_valid():
+                if detalles.has_changed():
+                    detalles.instance = self.object
+                    detalles.save()
+                self.object.actualizar_saldo_y_estado()
+                messages.success(self.request, f"Préstamo registrado con éxito.")
+                return redirect(self.success_url)
+            else:
+                return self.render_to_response(self.get_context_data(form=form, detalles=detalles))
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class PrestamoUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'RRHH.change_prestamo'
+    model = Prestamo
+    form_class = PrestamoForm
+    template_name = 'rrhh/prestamo_form.html'
+    success_url = reverse_lazy('rrhh:prestamo_list')
+
+    def get_context_data(self, **kwargs):
+        data = super().get_context_data(**kwargs)
+        data['tipos_prestamo_json'] = [
+            {'id': t.id, 'descripcion': t.descripcion, 'tasa_interes': t.tasa_interes}
+            for t in TipoPrestamo.objects.all()
+        ]
+        if 'detalles' in kwargs:
+            data['detalles'] = kwargs['detalles']
+        elif self.request.POST:
+            data['detalles'] = PrestamoDetalleFormSet(self.request.POST, instance=self.object)
+        else:
+            data['detalles'] = PrestamoDetalleFormSet(instance=self.object)
+        return data
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        detalles = context['detalles']
+
+        with transaction.atomic():
+            self.object = form.save()
+            if detalles.is_valid():
+                detalles.instance = self.object
+                detalles.save()
+
+                self.object.actualizar_saldo_y_estado()
+                messages.success(self.request, f"Préstamo actualizado con éxito.")
+                return redirect(self.success_url)
+            else:
+                return self.render_to_response(self.get_context_data(form=form, detalles=detalles))
+
+
+
+class PrestamoDeleteView(LoginRequiredMixin, PermissionRequiredMixin, DeleteView):
+    permission_required = 'RRHH.delete_prestamo'
+    model = Prestamo
+    template_name = 'rrhh/prestamo_confirm_delete.html'
+    success_url = reverse_lazy('rrhh:prestamo_list')
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(self.request, "Préstamo eliminado correctamente.")
+        return super().delete(request, *args, **kwargs)
+
+
+
+
+
+
+class PrestamoResumenView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'RRHH.view_prestamo'
+    model = Prestamo
+    template_name = 'rrhh/prestamo_resumen.html'
+    context_object_name = 'prestamos'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        totales = Prestamo.objects.aggregate(
+            total_solicitado=Sum('monto'),
+            total_interes=Sum('interes'),
+            total_pagar=Sum('monto_pagar'),
+            total_saldo=Sum('saldo'),
+            total_registros=Count('id')
+        )
+        context['totales'] = totales
+        resumen_empleados = (
+            Prestamo.objects.values('empleado__nombres')
+            .annotate(
+                total_prestamos=Count('id'),
+                monto_total=Sum('monto'),
+                monto_pagar_total=Sum('monto_pagar'),
+                saldo_pendiente=Sum('saldo')
+            )
+            .order_by('-monto_total')
+        )
+        context['resumen_empleados'] = resumen_empleados
+        return context
+
+
+@permission_required('RRHH.download_prestamo_pdf')
+def export_prestamo_list_pdf(request):
+    import io
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from django.http import HttpResponse
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    
+    story.append(Paragraph("Reporte General de Préstamos", title_style))
+    story.append(Spacer(1, 10))
+    
+    headers = ["ID", "Empleado", "Tipo Préstamo", "Fecha", "Monto", "Interés", "Total Pagar", "Saldo", "Estado"]
+    data = [headers]
+    
+    prestamos = Prestamo.objects.all().order_by('-fecha_prestamo')
+    for p in prestamos:
+        data.append([
+            str(p.id),
+            p.empleado.nombres,
+            p.tipo_prestamo.descripcion,
+            p.fecha_prestamo.strftime('%d/%m/%Y'),
+            f"${p.monto:.2f}",
+            f"${p.interes:.2f}",
+            f"${p.monto_pagar:.2f}",
+            f"${p.saldo:.2f}",
+            p.get_estado_display()
+        ])
+        
+    table = Table(data, colWidths=[30, 110, 85, 65, 60, 55, 65, 60, 50])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#F9F9F9")),
+    ]))
+    
+    story.append(table)
+    doc.build(story)
+    
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_general_prestamos.pdf"'
+    return response
+
+
+@permission_required('RRHH.download_prestamo_excel')
+def export_prestamo_list_excel(request):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from django.http import HttpResponse
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Préstamos"
+    
+    ws.merge_cells("A1:I1")
+    ws["A1"] = "REPORTE GENERAL DE PRÉSTAMOS"
+    ws["A1"].font = Font(name="Calibri", size=16, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 40
+    
+    headers = ["ID", "Empleado", "Tipo de Préstamo", "Fecha Préstamo", "Monto ($)", "Interés ($)", "Monto Total ($)", "Saldo ($)", "Estado"]
+    ws.append([])
+    ws.append(headers)
+    
+    header_fill = PatternFill(start_color="2F5597", end_color="2F5597", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    
+    for col in range(1, 10):
+        cell = ws.cell(row=3, column=col)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 25
+    
+    prestamos = Prestamo.objects.all().order_by('-fecha_prestamo')
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    
+    for p in prestamos:
+        ws.append([
+            p.id,
+            p.empleado.nombres,
+            p.tipo_prestamo.descripcion,
+            p.fecha_prestamo.strftime('%d/%m/%Y'),
+            float(p.monto),
+            float(p.interes),
+            float(p.monto_pagar),
+            float(p.saldo),
+            p.get_estado_display()
+        ])
+        
+    for r in range(4, ws.max_row + 1):
+        for c in range(1, 10):
+            cell = ws.cell(row=r, column=c)
+            cell.border = thin_border
+            if c in [5, 6, 7, 8]:
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+                cell.number_format = "$#,##0.00"
+            else:
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = 'attachment; filename="reporte_general_prestamos.xlsx"'
+    wb.save(response)
+    return response
+
+
+@permission_required('RRHH.download_prestamo_pdf')
+def export_prestamo_detail_pdf(request, pk):
+    import io
+    from django.shortcuts import get_object_or_404
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from django.http import HttpResponse
+    
+    prestamo = get_object_or_404(Prestamo, pk=pk)
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=54,
+        bottomMargin=54
+    )
+    
+    story = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=20,
+        textColor=colors.HexColor("#1F4E78"),
+        spaceAfter=15
+    )
+    
+    story.append(Paragraph(f"Tabla de Amortización - Préstamo #{prestamo.id}", title_style))
+    story.append(Spacer(1, 10))
+    
+    cabecera_data = [
+        ["Empleado:", prestamo.empleado.nombres, "Fecha Préstamo:", prestamo.fecha_prestamo.strftime('%d/%m/%Y')],
+        ["Tipo Préstamo:", prestamo.tipo_prestamo.descripcion, "Tasa Interés:", f"{prestamo.tipo_prestamo.tasa_interes}%"],
+        ["Monto Solicitado:", f"${prestamo.monto:.2f}", "Interés Generado:", f"${prestamo.interes:.2f}"],
+        ["Monto Total Pagar:", f"${prestamo.monto_pagar:.2f}", "Saldo Pendiente:", f"${prestamo.saldo:.2f}"],
+        ["Número Cuotas:", str(prestamo.numero_cuotas), "Estado:", prestamo.get_estado_display()]
+    ]
+    cabecera_table = Table(cabecera_data, colWidths=[120, 150, 140, 130])
+    cabecera_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    
+    story.append(cabecera_table)
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("Detalle de Cuotas del Préstamo", ParagraphStyle('Sub', parent=styles['Heading2'], fontSize=12, spaceAfter=8)))
+    
+    headers = ["N° Cuota", "Fecha Vencimiento", "Valor Cuota", "Saldo Cuota", "Estado"]
+    data = [headers]
+    
+    for d in prestamo.detalles.all():
+        est = "PAGADA" if d.saldo_cuota <= 0 else "PENDIENTE"
+        data.append([
+            f"Cuota #{d.numero_cuota}",
+            d.fecha_vencimiento.strftime('%d/%m/%Y'),
+            f"${d.valor_cuota:.2f}",
+            f"${d.saldo_cuota:.2f}",
+            est
+        ])
+        
+    table = Table(data, colWidths=[100, 150, 120, 120, 90])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1F4E78")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#F9F9F9")),
+    ]))
+    
+    story.append(table)
+    doc.build(story)
+    
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="prestamo_{prestamo.id}_{prestamo.empleado.nombres.replace(" ", "_")}.pdf"'
+    return response
+

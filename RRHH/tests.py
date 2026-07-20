@@ -180,3 +180,193 @@ class SobretiempoValidationTests(TestCase):
         formset = response.context['detalles']
         non_form_errors = formset.non_form_errors()
         self.assertTrue(any("El límite de horas extras por semana es de 12 horas" in err for err in non_form_errors))
+
+
+class PrestamoMasterDetailTests(TestCase):
+    def setUp(self):
+        from .models import TipoPrestamo, Prestamo, PrestamoDetalle
+        self.empleado = Empleado.objects.create(
+            nombres="Carlos Perez",
+            sueldo=Decimal("800.00")
+        )
+        self.tipo_prestamo = TipoPrestamo.objects.create(
+            descripcion="Préstamo Personal",
+            tasa_interes=10
+        )
+        from django.contrib.auth.models import User
+        self.superuser = User.objects.create_superuser(username='admin_test', password='password123')
+        self.client.force_login(self.superuser)
+
+    def test_prestamo_automatic_calculations_and_cuotas(self):
+        from .models import Prestamo
+        # Crear préstamo de $1000 a 10% de interés en 4 cuotas
+        prestamo = Prestamo.objects.create(
+            empleado=self.empleado,
+            tipo_prestamo=self.tipo_prestamo,
+            fecha_prestamo=date(2026, 7, 20),
+            monto=Decimal("1000.00"),
+            numero_cuotas=4
+        )
+
+        # 1. Verificar interés = 1000 * 10% = 100.00
+        self.assertEqual(prestamo.interes, Decimal("100.00"))
+        # 2. Verificar monto_pagar = 1000 + 100 = 1100.00
+        self.assertEqual(prestamo.monto_pagar, Decimal("1100.00"))
+        # 3. Verificar cuotas generadas automáticamente
+        detalles = prestamo.detalles.all()
+        self.assertEqual(detalles.count(), 4)
+        
+        # Cada cuota inicial = 1100 / 4 = 275.00
+        total_cuotas = sum(d.valor_cuota for d in detalles)
+        self.assertEqual(total_cuotas, Decimal("1100.00"))
+        self.assertEqual(prestamo.saldo, Decimal("1100.00"))
+        self.assertEqual(prestamo.estado, 'PEND')
+
+    def test_cuota_payment_updates_saldo_and_estado(self):
+        from .models import Prestamo
+        prestamo = Prestamo.objects.create(
+            empleado=self.empleado,
+            tipo_prestamo=self.tipo_prestamo,
+            fecha_prestamo=date(2026, 7, 20),
+            monto=Decimal("1000.00"),
+            numero_cuotas=2
+        )
+        # Total a pagar = $1100.00 en 2 cuotas de $550.00
+        detalles = list(prestamo.detalles.all())
+        self.assertEqual(len(detalles), 2)
+        
+        # Pagar la primera cuota
+        cuota1 = detalles[0]
+        cuota1.saldo_cuota = Decimal("0.00")
+        cuota1.save()
+        
+        prestamo.refresh_from_db()
+        self.assertEqual(prestamo.saldo, Decimal("550.00"))
+        self.assertEqual(prestamo.estado, 'PEND')
+        
+        # Pagar la segunda cuota
+        cuota2 = detalles[1]
+        cuota2.saldo_cuota = Decimal("0.00")
+        cuota2.save()
+        
+        prestamo.refresh_from_db()
+        self.assertEqual(prestamo.saldo, Decimal("0.00"))
+        self.assertEqual(prestamo.estado, 'PAG')
+
+    def test_prestamo_create_view_renders(self):
+        from django.urls import reverse
+        url = reverse('rrhh:prestamo_create')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Registrar Nuevo Préstamo")
+
+    def test_tipo_prestamo_tasa_interes_validation(self):
+        from .models import TipoPrestamo
+        tp_invalid = TipoPrestamo(descripcion="Interés Inválido", tasa_interes=-5)
+        with self.assertRaises(ValidationError):
+            tp_invalid.clean()
+
+        tp_high = TipoPrestamo(descripcion="Interés Excesivo", tasa_interes=60)
+        with self.assertRaises(ValidationError):
+            tp_high.clean()
+
+    def test_prestamo_quirografario_validation(self):
+        from .models import TipoPrestamo, Prestamo
+        tp_quiro = TipoPrestamo.objects.create(descripcion="Préstamo Quirografario", tasa_interes=12)
+        # Sueldo = $800, max quirografario monto = 800 * 12 = $9600
+        p_invalid = Prestamo(
+            empleado=self.empleado,
+            tipo_prestamo=tp_quiro,
+            fecha_prestamo=date(2026, 7, 20),
+            monto=Decimal("15000.00"),
+            numero_cuotas=12
+        )
+        with self.assertRaises(ValidationError):
+            p_invalid.clean()
+
+    def test_prestamo_solvency_capacity_validation(self):
+        from .models import TipoPrestamo, Prestamo
+        tp_hipo = TipoPrestamo.objects.create(descripcion="Préstamo Hipotecario", tasa_interes=8)
+        # Sueldo = $800, max cuota permitida 50% = $400.
+        # Solicitar $10000 en 5 cuotas -> cuota approx $2160 > $400
+        p_excessive_quota = Prestamo(
+            empleado=self.empleado,
+            tipo_prestamo=tp_hipo,
+            fecha_prestamo=date(2026, 7, 20),
+            monto=Decimal("10000.00"),
+            numero_cuotas=5
+        )
+    def test_prestamo_create_view_post_success(self):
+        from django.urls import reverse
+        from .models import Prestamo
+        url = reverse('rrhh:prestamo_create')
+        post_data = {
+            'empleado': self.empleado.id,
+            'tipo_prestamo': self.tipo_prestamo.id,
+            'fecha_prestamo': '2026-07-20',
+            'monto': '1000.00',
+            'numero_cuotas': '10',
+            'detalles-TOTAL_FORMS': '0',
+            'detalles-INITIAL_FORMS': '0',
+            'detalles-MIN_NUM_FORMS': '0',
+            'detalles-MAX_NUM_FORMS': '1000',
+        }
+        response = self.client.post(url, data=post_data)
+        self.assertEqual(response.status_code, 302)
+        prestamo = Prestamo.objects.get(empleado=self.empleado, monto=Decimal('1000.00'))
+        self.assertEqual(prestamo.detalles.count(), 10)
+
+    def test_prestamo_past_date_validation(self):
+        from .models import Prestamo
+        from datetime import timedelta
+        from django.utils import timezone
+        past_date = timezone.localdate() - timedelta(days=5)
+        p_past = Prestamo(
+            empleado=self.empleado,
+            tipo_prestamo=self.tipo_prestamo,
+            fecha_prestamo=past_date,
+            monto=Decimal("500.00"),
+            numero_cuotas=2
+        )
+        with self.assertRaises(ValidationError):
+            p_past.clean()
+
+    def test_sequential_cuota_payment_enforcement(self):
+        from django.urls import reverse
+        from .models import Prestamo
+        prestamo = Prestamo.objects.create(
+            empleado=self.empleado,
+            tipo_prestamo=self.tipo_prestamo,
+            fecha_prestamo=date(2026, 7, 20),
+            monto=Decimal("1000.00"),
+            numero_cuotas=3
+        )
+        cuotas = list(prestamo.detalles.all())
+        cuota1 = cuotas[0]
+        cuota2 = cuotas[1]
+
+        # Intentar pagar directamente la cuota #2 sin haber pagado la cuota #1
+        url_pagar_cuota2 = reverse('rrhh:pagar_cuota', kwargs={'cuota_id': cuota2.id})
+        response = self.client.get(url_pagar_cuota2)
+        
+        self.assertEqual(response.status_code, 302)
+        cuota2.refresh_from_db()
+        self.assertGreater(cuota2.saldo_cuota, Decimal('0.00'))
+
+
+        # Pagar primero la cuota #1
+        url_pagar_cuota1 = reverse('rrhh:pagar_cuota', kwargs={'cuota_id': cuota1.id})
+        self.client.get(url_pagar_cuota1)
+        cuota1.refresh_from_db()
+        self.assertEqual(cuota1.saldo_cuota, Decimal('0.00'))
+
+        # Ahora sí se debe permitir pagar la cuota #2
+        self.client.get(url_pagar_cuota2)
+        cuota2.refresh_from_db()
+        self.assertEqual(cuota2.saldo_cuota, Decimal('0.00'))
+
+
+
+
+
+

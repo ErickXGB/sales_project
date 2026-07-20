@@ -21,10 +21,13 @@ ROLES = {
         'view_cobrofactura', 'detail_cobrofactura', 'download_cobrofactura_pdf', 'download_cobrofactura_excel', 'whatsapp_cobrofactura',
         'view_pagocompra', 'detail_pagocompra', 'download_pagocompra_pdf', 'download_pagocompra_excel', 'whatsapp_pagocompra',
         'download_user_pdf', 'download_user_excel', 'detail_user',
-        # Permisos RRHH (Sobretiempos)
+        # Permisos RRHH (Sobretiempos y Préstamos)
         'view_sobretiempo', 'view_tiposobretiempo', 'view_empleado', 'view_sobretiempodetalle',
         'detail_sobretiempo', 'download_sobretiempo_pdf', 'download_sobretiempo_excel',
+        'view_prestamo', 'view_tipoprestamo', 'view_prestamodetalle',
+        'detail_prestamo', 'download_prestamo_pdf', 'download_prestamo_excel',
     ],
+
 
     # Compras administra Proveedores, Compras, Detalles de compra y Pagos de Compras.
     'Compras': [
@@ -83,11 +86,25 @@ class Command(BaseCommand):
             content_type=sobretiempo_ct,
             defaults={'name': 'Can download Sobretiempo Excel report'}
         )
+        # Asegurar que existan los permisos de descarga y detalle para Prestamo
+        from RRHH.models import Prestamo
+        prestamo_ct = ContentType.objects.get_for_model(Prestamo)
         Permission.objects.get_or_create(
-            codename='detail_sobretiempo',
-            content_type=sobretiempo_ct,
-            defaults={'name': 'Can view Sobretiempo details'}
+            codename='download_prestamo_pdf',
+            content_type=prestamo_ct,
+            defaults={'name': 'Can download Prestamo PDF report'}
         )
+        Permission.objects.get_or_create(
+            codename='download_prestamo_excel',
+            content_type=prestamo_ct,
+            defaults={'name': 'Can download Prestamo Excel report'}
+        )
+        Permission.objects.get_or_create(
+            codename='detail_prestamo',
+            content_type=prestamo_ct,
+            defaults={'name': 'Can view Prestamo details'}
+        )
+
 
         # Limpieza opcional de roles antiguos que ya no se usan
         roles_to_remove = ['Vendedor', 'Analista de Compras']

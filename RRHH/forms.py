@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Sobretiempo, SobretiempoDetalle
+from .models import Sobretiempo, SobretiempoDetalle, Prestamo, PrestamoDetalle, TipoPrestamo, Empleado
 
 class SobretiempoForm(forms.ModelForm):
     class Meta:
@@ -103,7 +103,6 @@ class BaseSobretiempoDetalleFormSet(forms.BaseInlineFormSet):
                 )
 
 
-
 SobretiempoDetalleFormSet = inlineformset_factory(
     Sobretiempo,
     SobretiempoDetalle,
@@ -116,4 +115,149 @@ SobretiempoDetalleFormSet = inlineformset_factory(
         'numero_horas': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
     }
 )
+
+
+class PrestamoForm(forms.ModelForm):
+    class Meta:
+        model = Prestamo
+        fields = ['empleado', 'tipo_prestamo', 'fecha_prestamo', 'monto', 'numero_cuotas', 'estado']
+        widgets = {
+            'empleado': forms.Select(attrs={'class': 'form-select'}),
+            'tipo_prestamo': forms.Select(attrs={'class': 'form-select'}),
+            'fecha_prestamo': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
+            'monto': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.01'}),
+            'numero_cuotas': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'estado': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.utils import timezone
+        if 'estado' in self.fields:
+            self.fields['estado'].required = False
+            self.fields['estado'].initial = 'PEND'
+        if 'fecha_prestamo' in self.fields and not self.instance.pk:
+            today_str = timezone.localdate().strftime('%Y-%m-%d')
+            self.fields['fecha_prestamo'].initial = today_str
+            self.fields['fecha_prestamo'].widget.attrs['min'] = today_str
+
+    def clean_fecha_prestamo(self):
+        fecha = self.cleaned_data.get('fecha_prestamo')
+        from django.utils import timezone
+        if not self.instance.pk and fecha and fecha < timezone.localdate():
+            raise forms.ValidationError(f"La fecha del préstamo no puede ser anterior a la fecha actual ({timezone.localdate().strftime('%d/%m/%Y')}).")
+        return fecha
+
+
+    def clean(self):
+        cleaned_data = super().clean()
+        empleado = cleaned_data.get('empleado')
+        tipo_prestamo = cleaned_data.get('tipo_prestamo')
+        fecha_prestamo = cleaned_data.get('fecha_prestamo')
+        monto = cleaned_data.get('monto')
+        numero_cuotas = cleaned_data.get('numero_cuotas')
+        estado = cleaned_data.get('estado') or 'PEND'
+
+        if empleado and tipo_prestamo and monto and numero_cuotas:
+            temp_prestamo = Prestamo(
+                empleado=empleado,
+                tipo_prestamo=tipo_prestamo,
+                fecha_prestamo=fecha_prestamo or (self.instance.fecha_prestamo if self.instance else None),
+                monto=monto,
+                numero_cuotas=numero_cuotas,
+                estado=estado
+            )
+            if self.instance and self.instance.pk:
+                temp_prestamo.pk = self.instance.pk
+
+            from django.core.exceptions import ValidationError
+            try:
+                temp_prestamo.clean()
+            except ValidationError as e:
+                if hasattr(e, 'error_dict'):
+                    for field, field_errors in e.error_dict.items():
+                        for err in field_errors:
+                            self.add_error(field, err)
+                else:
+                    raise e
+        return cleaned_data
+
+
+class BasePrestamoDetalleFormSet(forms.BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        
+        from decimal import Decimal
+        total_valor_cuotas = Decimal('0.00')
+        numeros_cuotas_vistos = set()
+        fechas_vencimiento = []
+
+        for form in self.forms:
+            if self.can_delete and self._should_delete_form(form):
+                continue
+            if not form.cleaned_data:
+                continue
+            
+            num = form.cleaned_data.get('numero_cuota')
+            f_venc = form.cleaned_data.get('fecha_vencimiento')
+            valor = form.cleaned_data.get('valor_cuota')
+            saldo = form.cleaned_data.get('saldo_cuota')
+
+            if num is not None:
+                if num in numeros_cuotas_vistos:
+                    raise forms.ValidationError(f"El número de cuota #{num} se encuentra duplicado.")
+                numeros_cuotas_vistos.add(num)
+
+            if valor is not None:
+                if valor <= Decimal('0.00'):
+                    raise forms.ValidationError("Todas las cuotas deben tener un valor mayor a cero.")
+                total_valor_cuotas += Decimal(str(valor))
+
+            if saldo is not None and valor is not None:
+                if saldo < Decimal('0.00'):
+                    raise forms.ValidationError("El saldo de una cuota no puede ser negativo.")
+                if saldo > valor:
+                    raise forms.ValidationError("El saldo de una cuota no puede superar el valor de la cuota.")
+
+            if f_venc:
+                fechas_vencimiento.append((num, f_venc))
+
+        # Validar orden cronológico de fechas de vencimiento
+        fechas_vencimiento.sort(key=lambda x: x[0] if x[0] else 0)
+        for i in range(1, len(fechas_vencimiento)):
+            if fechas_vencimiento[i][1] < fechas_vencimiento[i-1][1]:
+                raise forms.ValidationError(
+                    f"La fecha de vencimiento de la cuota #{fechas_vencimiento[i][0]} "
+                    f"({fechas_vencimiento[i][1].strftime('%d/%m/%Y')}) no puede ser anterior a la cuota anterior "
+                    f"({fechas_vencimiento[i-1][1].strftime('%d/%m/%Y')})."
+                )
+
+        # Si el préstamo ya existe y tiene monto_pagar definido, validar suma total
+        prestamo_inst = getattr(self, 'instance', None)
+        if prestamo_inst and prestamo_inst.pk and prestamo_inst.monto_pagar and total_valor_cuotas > 0:
+            diferencia = abs(total_valor_cuotas - prestamo_inst.monto_pagar)
+            if diferencia > Decimal('0.10'):
+                raise forms.ValidationError(
+                    f"La suma de las cuotas (${total_valor_cuotas:.2f}) debe coincidir con el monto total a pagar del préstamo (${prestamo_inst.monto_pagar:.2f})."
+                )
+
+
+PrestamoDetalleFormSet = inlineformset_factory(
+    Prestamo,
+    PrestamoDetalle,
+    formset=BasePrestamoDetalleFormSet,
+    fields=['numero_cuota', 'fecha_vencimiento', 'valor_cuota', 'saldo_cuota'],
+    extra=0,
+    can_delete=True,
+    widgets={
+        'numero_cuota': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+        'fecha_vencimiento': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
+        'valor_cuota': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.00'}),
+        'saldo_cuota': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0.00'}),
+    }
+)
+
+
 

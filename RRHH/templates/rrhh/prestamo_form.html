@@ -1,0 +1,221 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}{% if object %}Editar Préstamo #{{ object.id }}{% else %}Nuevo Préstamo{% endif %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="mb-0 fw-bold">
+                    <i class="bi bi-cash-coin me-2"></i>
+                    {% if object %}Editar Préstamo #{{ object.id }}{% else %}Registrar Nuevo Préstamo{% endif %}
+                </h5>
+
+                <a href="{% url 'rrhh:prestamo_list' %}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Volver a la lista
+                </a>
+            </div>
+
+            <div class="card-body p-4">
+                <form method="post" id="prestamoForm">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Cabecera Maestro -->
+                    <h6 class="fw-bold text-primary mb-3"><i class="bi bi-card-heading me-1"></i> Datos de Cabecera (Maestro)</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Empleado <span class="text-danger">*</span></label>
+                            {{ form.empleado }}
+                            {% if form.empleado.errors %}
+                            <div class="text-danger small mt-1">{{ form.empleado.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Tipo de Préstamo <span class="text-danger">*</span></label>
+                            {{ form.tipo_prestamo }}
+                            {% if form.tipo_prestamo.errors %}
+                            <div class="text-danger small mt-1">{{ form.tipo_prestamo.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Fecha de Préstamo <span class="text-danger">*</span></label>
+                            {{ form.fecha_prestamo }}
+                            {% if form.fecha_prestamo.errors %}
+                            <div class="text-danger small mt-1">{{ form.fecha_prestamo.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Monto Solicitado ($) <span class="text-danger">*</span></label>
+                            {{ form.monto }}
+                            {% if form.monto.errors %}
+                            <div class="text-danger small mt-1">{{ form.monto.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Número de Cuotas <span class="text-danger">*</span></label>
+                            {{ form.numero_cuotas }}
+                            {% if form.numero_cuotas.errors %}
+                            <div class="text-danger small mt-1">{{ form.numero_cuotas.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        {% if object %}
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Estado del Préstamo</label>
+                            {{ form.estado }}
+                            {% if form.estado.errors %}
+                            <div class="text-danger small mt-1">{{ form.estado.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                    </div>
+
+                    <!-- Cuadro Resumen de Cálculos en Pantalla -->
+                    <div class="card bg-light border-0 mb-4 shadow-sm">
+                        <div class="card-body">
+                            <h6 class="fw-bold text-dark mb-3"><i class="bi bi-calculator me-2 text-primary"></i> Resumen de Cálculos Automáticos</h6>
+                            <div class="row text-center g-3">
+                                <div class="col-md-3">
+                                    <div class="p-2 bg-white rounded border">
+                                        <div class="text-muted small">Tasa de Interés</div>
+                                        <div class="fs-5 fw-bold text-dark" id="calcTasa">0%</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-2 bg-white rounded border">
+                                        <div class="text-muted small">Valor del Interés</div>
+                                        <div class="fs-5 fw-bold text-warning" id="calcInteres">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-2 bg-white rounded border">
+                                        <div class="text-muted small">Monto Total a Pagar</div>
+                                        <div class="fs-5 fw-bold text-primary" id="calcMontoPagar">$0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="p-2 bg-white rounded border">
+                                        <div class="text-muted small">Valor Cuota Promedio</div>
+                                        <div class="fs-5 fw-bold text-success" id="calcValorCuota">$0.00</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Detalle de Cuotas -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-primary mb-0"><i class="bi bi-list-ol me-1"></i> Detalle de Cuotas (Amortización)</h6>
+                    </div>
+
+                    {{ detalles.management_form }}
+                    {% if detalles.non_form_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in detalles.non_form_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-bordered table-hover align-middle" id="cuotasTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 10%;">N° Cuota</th>
+                                    <th style="width: 30%;">Fecha Vencimiento</th>
+                                    <th style="width: 25%;">Valor Cuota ($)</th>
+                                    <th style="width: 25%;">Saldo Cuota ($)</th>
+                                    {% if object %}<th style="width: 10%;" class="text-center">Eliminar</th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody id="detallesBody">
+                                {% for detail_form in detalles %}
+                                <tr class="detalle-row">
+                                    <td>
+                                        {% for hidden in detail_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                        {{ detail_form.numero_cuota }}
+                                    </td>
+                                    <td>{{ detail_form.fecha_vencimiento }}</td>
+                                    <td>{{ detail_form.valor_cuota }}</td>
+                                    <td>{{ detail_form.saldo_cuota }}</td>
+                                    {% if object %}
+                                    <td class="text-center">
+                                        {% if detail_form.instance.pk %}
+                                            {{ detail_form.DELETE }}
+                                        {% endif %}
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'rrhh:prestamo_list' %}" class="btn btn-secondary px-4">Cancelar</a>
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold">
+                            <i class="bi bi-save me-1"></i> Guardar Préstamo
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tiposPrestamo = {{ tipos_prestamo_json|safe }};
+    
+    const tipoSelect = document.getElementById('id_tipo_prestamo');
+    const montoInput = document.getElementById('id_monto');
+    const cuotasInput = document.getElementById('id_numero_cuotas');
+    const fechaInput = document.getElementById('id_fecha_prestamo');
+    
+    const calcTasa = document.getElementById('calcTasa');
+    const calcInteres = document.getElementById('calcInteres');
+    const calcMontoPagar = document.getElementById('calcMontoPagar');
+    const calcValorCuota = document.getElementById('calcValorCuota');
+    
+    function calcularPrestamo() {
+        const selectedTipoId = parseInt(tipoSelect.value);
+        const tipoObj = tiposPrestamo.find(t => t.id === selectedTipoId);
+        const tasa = tipoObj ? parseFloat(tipoObj.tasa_interes) : 0;
+        
+        const monto = parseFloat(montoInput.value) || 0;
+        const numCuotas = parseInt(cuotasInput.value) || 1;
+        
+        const interes = (monto * (tasa / 100));
+        const montoTotal = monto + interes;
+        const valorCuota = numCuotas > 0 ? (montoTotal / numCuotas) : 0;
+        
+        calcTasa.textContent = tasa + '%';
+        calcInteres.textContent = '$' + interes.toFixed(2);
+        calcMontoPagar.textContent = '$' + montoTotal.toFixed(2);
+        calcValorCuota.textContent = '$' + valorCuota.toFixed(2);
+    }
+    
+    if (tipoSelect) tipoSelect.addEventListener('change', calcularPrestamo);
+    if (montoInput) montoInput.addEventListener('input', calcularPrestamo);
+    if (cuotasInput) cuotasInput.addEventListener('input', calcularPrestamo);
+    if (fechaInput) fechaInput.addEventListener('change', calcularPrestamo);
+    
+    // Cálculo inicial en carga
+    calcularPrestamo();
+});
+</script>
+{% endblock %}

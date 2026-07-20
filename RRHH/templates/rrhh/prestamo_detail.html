@@ -1,0 +1,163 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}Detalle del Préstamo #{{ prestamo.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="fw-bold mb-1">
+            <i class="bi bi-receipt text-primary me-2"></i>Préstamo #{{ prestamo.id }}
+        </h3>
+        <p class="text-muted mb-0">Detalle maestro y tabla de amortización de cuotas</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'rrhh:prestamo_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Volver al listado
+        </a>
+        <a href="{% url 'rrhh:prestamo_detail_pdf' prestamo.id %}" class="btn btn-outline-danger btn-sm font-weight-bold">
+            <i class="bi bi-file-pdf me-1"></i> PDF
+        </a>
+        <a href="{% url 'rrhh:prestamo_update' prestamo.id %}" class="btn btn-warning btn-sm fw-semibold">
+            <i class="bi bi-pencil me-1"></i> Editar
+        </a>
+    </div>
+</div>
+
+<!-- Tarjeta Principal Maestro -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-light py-3 border-0">
+        <h5 class="mb-0 fw-bold text-dark"><i class="bi bi-person-vcard me-2 text-primary"></i> Información del Préstamo (Maestro)</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Empleado</span>
+                    <span class="fs-5 fw-bold text-dark">{{ prestamo.empleado.nombres }}</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Tipo de Préstamo</span>
+                    <span class="fs-5 fw-bold text-dark">{{ prestamo.tipo_prestamo.descripcion }} ({{ prestamo.tipo_prestamo.tasa_interes }}% Interés)</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Fecha de Registro</span>
+                    <span class="fs-5 fw-bold text-dark">{{ prestamo.fecha_prestamo|date:"d/m/Y" }}</span>
+                </div>
+            </div>
+
+            <div class="col-md-3">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Monto Solicitado</span>
+                    <span class="fs-5 fw-bold text-primary">${{ prestamo.monto }}</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Interés Generado</span>
+                    <span class="fs-5 fw-bold text-warning">${{ prestamo.interes }}</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Monto Total a Pagar</span>
+                    <span class="fs-5 fw-bold text-info">${{ prestamo.monto_pagar }}</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Saldo Pendiente</span>
+                    <span class="fs-5 fw-bold {% if prestamo.saldo > 0 %}text-danger{% else %}text-success{% endif %}">${{ prestamo.saldo }}</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Número de Cuotas</span>
+                    <span class="fs-5 fw-bold text-dark">{{ prestamo.numero_cuotas }} cuota(s)</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 bg-light rounded">
+                    <span class="text-muted small d-block">Estado General</span>
+                    {% if prestamo.estado == 'PEND' %}
+                        <span class="badge bg-warning text-dark fs-6 mt-1"><i class="bi bi-clock-history me-1"></i>Pendiente</span>
+                    {% elif prestamo.estado == 'PAG' %}
+                        <span class="badge bg-success fs-6 mt-1"><i class="bi bi-check-circle me-1"></i>Pagado</span>
+                    {% else %}
+                        <span class="badge bg-secondary fs-6 mt-1"><i class="bi bi-x-circle me-1"></i>Anulado</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla Detalle de Cuotas -->
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-primary text-white py-3">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-list-check me-2"></i> Cuotas del Préstamo (Detalle)</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Cuota N°</th>
+                        <th>Fecha Vencimiento</th>
+                        <th>Valor Cuota</th>
+                        <th>Saldo Cuota</th>
+                        <th>Estado Cuota</th>
+                        <th class="text-center pe-4">Acción / Pago</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in prestamo.detalles.all %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">Cuota #{{ d.numero_cuota }}</td>
+                        <td><i class="bi bi-calendar-event me-1 text-muted"></i>{{ d.fecha_vencimiento|date:"d/m/Y" }}</td>
+                        <td class="fw-semibold">${{ d.valor_cuota }}</td>
+                        <td class="fw-bold {% if d.saldo_cuota > 0 %}text-danger{% else %}text-success{% endif %}">${{ d.saldo_cuota }}</td>
+                        <td>
+                            {% if d.saldo_cuota <= 0 %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                    <i class="bi bi-check2-all me-1"></i>PAGADA
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                                    <i class="bi bi-hourglass me-1"></i>PENDIENTE
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center pe-4">
+                            {% if d.saldo_cuota > 0 and prestamo.estado != 'ANU' %}
+                                {% if d.id == proxima_cuota_id %}
+                                <a href="{% url 'rrhh:pagar_cuota' d.id %}" class="btn btn-sm btn-success fw-semibold" onclick="return confirm('¿Confirmar el pago completo de la cuota #{{ d.numero_cuota }}?');">
+                                    <i class="bi bi-cash me-1"></i> Pagar Cuota #{{ d.numero_cuota }}
+                                </a>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-secondary" disabled title="Debe pagar primero las cuotas anteriores">
+                                    <i class="bi bi-lock-fill me-1"></i> Bloqueada
+                                </button>
+                                {% endif %}
+                            {% else %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle py-2 px-3">
+                                <i class="bi bi-check-circle-fill me-1"></i> PAGADA
+                            </span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">No se han registrado cuotas para este préstamo.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

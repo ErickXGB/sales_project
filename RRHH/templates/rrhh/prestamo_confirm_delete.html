@@ -1,0 +1,31 @@
+{% extends 'billing/base.html' %}
+
+{% block title %}Eliminar Préstamo #{{ object.id }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0 border-top border-4 border-danger">
+            <div class="card-body p-4 text-center">
+                <i class="bi bi-exclamation-triangle-fill text-danger display-1 mb-3"></i>
+                <h4 class="fw-bold mb-2">¿Confirmar Eliminación?</h4>
+                <p class="text-muted mb-4">
+                    Está a punto de eliminar el préstamo <strong>#{{ object.id }}</strong> perteneciente a 
+                    <strong>{{ object.empleado.nombres }}</strong> por un monto de <strong>${{ object.monto }}</strong>.
+                    Esta acción también eliminará todas las cuotas (detalles) asociadas.
+                </p>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-center gap-3">
+                        <a href="{% url 'rrhh:prestamo_list' %}" class="btn btn-secondary px-4">Cancelar</a>
+                        <button type="submit" class="btn btn-danger px-4 fw-semibold">
+                            <i class="bi bi-trash me-1"></i> Confirmar Eliminación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
