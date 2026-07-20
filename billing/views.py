@@ -1064,8 +1064,6 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                         
                         if clave:
                             local_invoice.clave_acceso = clave
-                        if sec_sri:
-                            local_invoice.numero = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
                         
                         if success:
                             local_invoice.estado_sri = 'AUTORIZADO'
@@ -1096,7 +1094,14 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                                 "errors": errors_list
                             }) + "\n"
                         
-                        local_invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                        try:
+                            if sec_sri:
+                                cand_num = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
+                                if not Invoice.objects.filter(numero=cand_num).exclude(pk=local_invoice.pk).exists():
+                                    local_invoice.numero = cand_num
+                            local_invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                        except Exception:
+                            local_invoice.save(update_fields=['clave_acceso', 'estado_sri'])
                     else:
                         try:
                             err_detail = response.json().get("detail", "Error interno en el microservicio.")
@@ -1310,8 +1315,6 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                     
                     if clave:
                         invoice.clave_acceso = clave
-                    if sec_sri:
-                        invoice.numero = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
                     
                     if success:
                         invoice.estado_sri = 'AUTORIZADO'
@@ -1328,7 +1331,14 @@ class InvoiceCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
                                 msg_info += f" ({d.get('informacion_adicional')})"
                             messages.error(request, msg_info)
                     
-                    invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                    try:
+                        if sec_sri:
+                            cand_num = f"{empresa.codigo_establecimiento}-{empresa.codigo_punto_emision}-{sec_sri}"
+                            if not Invoice.objects.filter(numero=cand_num).exclude(pk=invoice.pk).exists():
+                                invoice.numero = cand_num
+                        invoice.save(update_fields=['clave_acceso', 'estado_sri', 'numero'])
+                    except Exception:
+                        invoice.save(update_fields=['clave_acceso', 'estado_sri'])
                 else:
                     try:
                         err_detail = response.json().get("detail", "Error interno en el microservicio.")
